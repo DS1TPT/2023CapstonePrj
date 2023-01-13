@@ -26,14 +26,16 @@
 
 /* check source file for header and container info. */
 
+#ifndef RPICOMM_H
+#define RPICOMM_H
+
 /* definitions */
-// header
 #define TYPE_NO 0
 #define TYPE_CONN 1
 #define TYPE_SCHEDULE_TIME 2
 #define TYPE_SCHEDULE_PATTERN 4
 #define TYPE_SCHEDULE_SNACK 8
-#define TYPE_SCHEDULE_MODE 16
+#define TYPE_SCHEDULE_SPEED 16
 #define TYPE_SYS 32
 #define TYPE_MANUAL_CTRL 64
 
@@ -48,5 +50,10 @@ struct SerialDta {
 
 /* exported func prototypes */
 void rpi_init();
-int rpi_getSerialDta(struct SerialDta dest); // return zero if data is unavailable
+void rpi_RxCpltCallbackHandler();
+int rpi_getSerialDta(struct SerialDta dest); // returns zero if no data is available
 uint8_t rpi_getPinDta();
+int rpi_tcpipAvailable(); // returns zero if not available
+int rpi_tcpipRespond(); // send RESP pkt to client app. returns 0 on success
+
+#endif
