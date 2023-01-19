@@ -55,14 +55,14 @@
 #include "main.h"
 #include "rpicomm.h"
 
-struct SerialDta uartdta;
+struct SerialDta UARTdta;
 uint8_t rxBuf[9] = { 0, };
 uint8_t txBuf[8] = { 0, };
 
 int rpi_getSerialDta(struct SerialDta dest) {
-	if (uartdta.available) { // has new received data
-		dest = uartdta; // copy from internal var to dest var
-		uartdta.available = 0; // mark unavailable
+	if (UARTdta.available) { // has new received data
+		dest = UARTdta; // copy from internal var to dest var
+		UARTdta.available = 0; // mark unavailable
 		return 1;
 	}
 	else return 0;
@@ -78,7 +78,7 @@ uint8_t rpi_getPinDta() {
 }
 
 void rpi_init() {
-	uartdta.available = 0;
+	UARTdta.available = 0;
 	for (int i = 0; i < 9; i++)
 		rxBuf[i] = 0;
 	pinDta = 0;
@@ -86,20 +86,26 @@ void rpi_init() {
 }
 
 void rpi_RxCpltCallbackHandler() {
-	uartdta.available = 1; // mark available
-	uartdta.type = rxBuf[0]; // copy data from buffer to internal var
+	UARTdta.available = 1; // mark available
+	UARTdta.type = rxBuf[0]; // copy data from buffer to internal var
 	for (int i = 0; i < 8; i++)
-		uartdta.container[i] = rxBuf[i + 1];
+		UARTdta.container[i] = rxBuf[i + 1];
 	for (int i = 0; i < 9; i++) // clr buf
 		rxBuf[i] = 0;
 	HAL_UART_Receive_IT(&huart1, &rxBuf, 9); // restart rx
 }
 
 int rpi_tcpipAvailable() { // returns zero if not available
-
+	if (UARTdta.available) return 1;
+	else return 0;
 }
-int rpi_tcpipRespond() { // send RESP pkt to client app. returns 0 on success
-
+int rpi_tcpipRespond(uint8_t isErr) { // send RESP pkt to client app. returns OK on success
+	uint8_t buf[8] = { 0, };
+	buf[0] = 0xFF;
+	if (!isErr) buf[1] = 0xFF;
+	uint32_t txRes = HAL_UART_Transmit(&huart1, buf, 8, 20);
+	if (txRes == HAL_OK) return OK;
+	else return ERR;
 }
 
 /* ADD THIS TO MAIN.C
