@@ -28,10 +28,10 @@
 
 /* includes */
 #include "main.h"
-#include "rpicomm.h"
+//#include "rpicomm.h"
 
 /* exported struct */
-struct patternQueue {
+struct PatternQueue {
 	unsigned count;
 	uint8_t queue[70];
 };
