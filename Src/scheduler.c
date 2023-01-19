@@ -25,22 +25,22 @@
 
 #include "scheduler.h"
 
-struct time {
+struct Time {
 	int32_t sec;
 	int isSet;
 };
 
-struct patternQueue qp;
-struct time t;
+struct PatternQueue QP;
+struct Time T;
 uint8_t speed; // 0 ~ 4.
 
 void scheduler_init() {
-	qp.count = 0;
+	QP.count = 0;
 	for (int i = 0; i < 70; i++) {
-		qp.queue[i] = 0;
+		QP.queue[i] = 0;
 	}
-	t.sec = 0;
-	t.isSet = FALSE;
+	T.sec = 0;
+	T.isSet = FALSE;
 	spd = 2; // initial value is normal
 }
 
@@ -49,30 +49,30 @@ void scheduler_setSpd(uint8_t spd) {
 }
 
 int scheduler_enqueuePattern(uint8_t code) {
-	if (qp.count == 70) return ERR;
+	if (QP.count == 70) return ERR;
 	for (int i = 0; i < count - 1; i++)
-		qp.queue[i + 1] = qp.queue[i];
-	qp.queue[i] = code;
-	qp.count++;
+		QP.queue[i + 1] = QP.queue[i];
+	QP.queue[i] = code;
+	QP.count++;
 	return OK;
 }
 
 int scheduler_dequeuePattern() {
-	if (!qp.count) return ERR;
+	if (!QP.count) return ERR;
 
 	uint8_t tmp;
-	tmp = qp.queue[count - 1];
-	qp.queue[(count--) - 1] = 0;
+	tmp = QP.queue[count - 1];
+	QP.queue[(count--) - 1] = 0;
 	return OK;
 }
 
 int scheduler_setTime(int32_t sec) {
-	if (t.isSet) return 1;
+	if (T.isSet) return 1;
 }
 
 int scheduler_TimCallbackHandler() {
-	if (t.isSet)
-		if (!(--t.sec)) return 1;
+	if (T.isSet)
+		if (!(--T.sec)) return 1;
 	return 0;
 }
 
