@@ -24,6 +24,8 @@ USART1: 라즈베리파이와의 통신(9600bps, Async, 8b, no parity, stop 1)
 
 PA0: 라즈베리파이 GPIO, 고양이 인식됨
 PA1: 라즈베리파이 GPIO, 예비
-PC0: L298N, 왼쪽 모터 ENA. GPIO-O
-PC1: L298N, 오른쪽 모터 ENA. GPIO-O
-PC2~5: 예비. GPIO-O
+PA6: L298N, 모터A, TIM3 PWM CH1
+PA7: L298N, 모터B, TIM3 PWM CH2
+PC0, PC1: L298N, 모터A IN. GPIO-O
+PC2, PC3: L298N, 모터B IN. GPIO-O
+PC4, PC5: 예비. GPIO-O
