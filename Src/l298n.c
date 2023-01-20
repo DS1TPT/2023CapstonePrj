@@ -27,13 +27,13 @@
 #include "l298n.h"
 
 struct L298nStats L298Nstat;
-uint32_t timFreq = 0;
-uint16_t spdMultr = 0;
-uint16_t spd16a = 0;
-uint16_t spd16b = 0;
+uint16_t spdMultr;
+uint16_t spd16a;
+uint16_t spd16b;
 
 void l298n_init() {
 	// init status struct
+	L298Nstat.ena = FALSE;
 	L298Nstat.rotA = L298N_STOP;
 	L298Nstat.rotB = L298N_STOP;
 	L298Nstat.spdA = 0;
@@ -48,21 +48,35 @@ void l298n_init() {
 	HAL_GPIO_WritePin(L298N_IN_PORT, L298N_IN_4, GPIO_PIN_RESET);
 
 	// calculate timer period
-	timFreq = (L298N_TIM_APB_CLK / L298N_TIM->PSC) / L298N_TIM->ARR;
-	spdMultr = (uint16_t)(timFreq / 100);
+	spdMultr = (uint16_t)(L298N_TIM->ARR / 100);
 
 	// init PWM: set to LOW
 	L298N_TIM->CCR1 = 0;
 	L298N_TIM->CCR2 = 0;
 }
 
-void l298n_disable(uint8_t motorNum) { // implies setRotation( , STOP): disable motor operation
+void l298n_enable() { // enable motor operation. This starts PWM generation.
+	if (L298Nstat.ena == TRUE) return;
+	HAL_TIM_PWM_START(L298N_TIM_HANDLE, TIM_CHANNEL_1);
+	HAL_TIM_PWM_START(L298N_TIM_HANDLE, TIM_CHANNEL_2);
+	L298Nstat.ena = TRUE;
+}
+
+void l298n_disable() { // implies setRotation( , STOP): disable motor operation. This stops PWM generation.
+	if (L298Nstat.ena == FALSE) return;
+
 	l298n_setRotation(L298N_MOTOR_A, L298N_STOP);
 	l298n_setRotation(L298N_MOTOR_B, L298N_STOP);
+	HAL_TIM_PWM_STOP(L298N_TIM_HANDLE, TIM_CHANNEL_1);
+	HAL_TIM_PWM_STOP(L298N_TIM_HANDLE, TIM_CHANNEL_2);
+	L298Nstat.ena = FALSE;
 }
 
 void l298n_setSpeed(uint8_t motorNum, uint8_t spd) { // speed scale: 0(stop) to 100(max.)
+	if (L298Nstat.ena == FALSE) return;
+	if (motorNum > L298N_MOTOR_B) return;
 	if (spd > 100) return; // limit max inp val to 100
+
 	else if (motorNum == L298N_MOTOR_A) {
 		L298Nstat.spdA = spd;
 		spd16a = (uint16_t)(spd * spdMultr);
@@ -76,6 +90,9 @@ void l298n_setSpeed(uint8_t motorNum, uint8_t spd) { // speed scale: 0(stop) to 
 }
 
 void l298n_setRotation(uint8_t motorNum, uint8_t dir) { // implies setSpeed(motorNum, 0): set rotation CW or CCW.
+	if (L298Nstat.ena == FALSE) return;
+	if (motorNum > L298N_MOTOR_B) return;
+
 	l298n_setSpeed(motorNum, 0);
 	if (motorNum == L298N_MOTOR_A) {
 		switch (dir) {
