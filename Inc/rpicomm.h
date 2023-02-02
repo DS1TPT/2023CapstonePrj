@@ -52,9 +52,9 @@ struct SerialDta {
 /* exported func prototypes */
 void rpi_init();
 void rpi_RxCpltCallbackHandler();
-int rpi_getSerialDta(struct SerialDta dest); // returns zero if no data is available
+int rpi_getSerialDta(struct SerialDta dest); // returns zero if no data is available, even though flag will be set by callback handler...
 uint8_t rpi_getPinDta();
-int rpi_tcpipAvailable(); // returns zero if not available
+int rpi_serialDtaAvailable(); // returns zero if not available
 int rpi_tcpipRespond(uint8_t isErr); // send RESP pkt to client app. returns 0 on success
 
 #endif
