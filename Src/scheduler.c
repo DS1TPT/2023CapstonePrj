@@ -25,6 +25,11 @@
 
 #include "scheduler.h"
 
+struct PatternQueue {
+	unsigned count;
+	uint8_t queue[70];
+};
+
 struct Time {
 	int32_t sec;
 	int isSet;
@@ -68,12 +73,21 @@ int scheduler_dequeuePattern() {
 
 int scheduler_setTime(int32_t sec) {
 	if (T.isSet) return 1;
+	else {
+		T.isSet = TRUE;
+		T.sec = sec;
+	}
 }
 
 int scheduler_TimCallbackHandler() {
 	if (T.isSet)
 		if (!(--T.sec)) return 1;
 	return 0;
+}
+
+int scheduler_isSet() {
+	if (!T.isSet || !QP.count) return 0;
+	else return 1;
 }
 
 /* ADD THIS TO MAIN.C
