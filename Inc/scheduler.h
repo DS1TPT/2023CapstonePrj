@@ -31,10 +31,6 @@
 //#include "rpicomm.h"
 
 /* exported struct */
-struct PatternQueue {
-	unsigned count;
-	uint8_t queue[70];
-};
 
 /* exported vars */
 
@@ -45,5 +41,6 @@ int scheduler_setTime(int32_t sec); // set time and start timer. returns OK on s
 int scheduler_enqueuePattern(uint8_t code); // returns ERR if queue is full, returns OK otherwise
 int scheduler_dequeuePattern(); // returns ERR if queue is empty, returns OK otherwise
 int scheduler_TimCallbackHandler(); // returns 0 if time is not elapsed or time is not set. returns 1 if elapsed
+int scheduler_isSet(); // check if schedule is set and complete, returns 0 if schedule is not set
 
 #endif
