@@ -95,7 +95,7 @@ void rpi_RxCpltCallbackHandler() {
 	HAL_UART_Receive_IT(&huart1, &rxBuf, 9); // restart rx
 }
 
-int rpi_tcpipAvailable() { // returns zero if not available
+int rpi_serialDtaAvailable() { // returns zero if not available
 	if (UARTdta.available) return 1;
 	else return 0;
 }
@@ -112,7 +112,6 @@ int rpi_tcpipRespond(uint8_t isErr) { // send RESP pkt to client app. returns OK
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
 	if (huart->Instance == USART1) {
 		rpi_RxCpltCallbackHandler();
-		flagRxCplt = TRUE;
 	}
 }
 */
