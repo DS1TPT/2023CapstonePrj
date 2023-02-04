@@ -3,22 +3,10 @@
   * NAME OF THE FILE : scheduler.c
   * BRIEF INFORMATION: auto-play schedule manager
   *
-  * !ATTENTION!
-  *
   * Copyright (c) 2023 Lee Geon-goo.
   * All rights reserved.
   *
   * This file is part of catCareBot.
-  * catCareBot is free software: you can redistribute it and/or modify it under the
-  * terms of the GNU General Public License as published by the Free Software Foundation,
-  * either version 3 of the License, or (at your option) any later version.
-  *
-  * catCareBot is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
-  * without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
-  * See the GNU General Public License for more details.
-  *
-  * You should have received a copy of the GNU General Public License along with catCareBot.
-  * If not, see <https://www.gnu.org/licenses/>.
   *
   *********************************************************************************************
   */
@@ -37,7 +25,8 @@ struct Time {
 
 struct PatternQueue QP;
 struct Time T;
-uint8_t speed; // 0 ~ 4.
+uint8_t speed = 0; // 0 ~ 4.
+uint8_t snackNum = 0;
 
 void scheduler_init() {
 	QP.count = 0;
@@ -46,11 +35,16 @@ void scheduler_init() {
 	}
 	T.sec = 0;
 	T.isSet = FALSE;
-	spd = 2; // initial value is normal
+	speed = 2; // initial value is normal
+	snackNum = 0;
 }
 
 void scheduler_setSpd(uint8_t spd) {
 	speed = spd;
+}
+
+void scheduler_setSnack(uint8_t num) {
+	snackNum = num;
 }
 
 int scheduler_enqueuePattern(uint8_t code) {
@@ -88,6 +82,14 @@ int scheduler_TimCallbackHandler() {
 int scheduler_isSet() {
 	if (!T.isSet || !QP.count) return 0;
 	else return 1;
+}
+
+uint8_t scheduler_getSpd() {
+	return speed;
+}
+
+uint8_t scheduler_getSnack() {
+	return snackNum;
 }
 
 /* ADD THIS TO MAIN.C
