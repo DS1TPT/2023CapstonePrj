@@ -23,10 +23,9 @@
 #define L298N_MOTOR_A 0
 #define L298N_MOTOR_B 1
 
-#define L298N_TIM_HANDLE &htim3
-
 // edit here if system configuration is changed
 #define L298N_TIM TIM3 // CAUTION: PSC, ARR, CCR use 16b val, but stm32cubeide's typedef is 32b.
+#define L298N_TIM_HANDLE &htim3
 #define L298N_IN_PORT GPIOC // C0~C3
 #define L298N_IN_1 GPIO_PIN_0
 #define L298N_IN_2 GPIO_PIN_1
