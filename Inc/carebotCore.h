@@ -11,15 +11,17 @@
   *********************************************************************************************
   */
 
-#ifndef CAREBOTCORE_H_
-#define CAREBOTCORE_H_
+#ifndef CAREBOTCORE_H
+#define CAREBOTCORE_H
 
-/*
- * core will control every hardware after the main calls start function.
- */
+// core will control every hardware after the main calls start function.
 
 #include "main.h"
 
+#define CORE_SEC_TIM TIM10
+#define CORE_SEC_TIM_HANDLE &htim10
+
 void core_start(); // this should be called only once by main.c
+void core_callOp(uint8_t opcode); // opman will call this
 
 #endif
