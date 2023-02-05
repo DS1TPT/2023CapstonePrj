@@ -14,10 +14,11 @@
 #include "main.h"
 #include "l298n.h"
 
-struct L298nStats L298Nstat;
-uint16_t spdMultr;
-uint16_t spd16a;
-uint16_t spd16b;
+static struct L298nStats L298Nstat;
+static uint16_t spdMultr;
+static uint16_t spd16a;
+static uint16_t spd16b;
+static uint8_t timEna = FALSE;
 
 void l298n_init() {
 	// init status struct
@@ -34,6 +35,12 @@ void l298n_init() {
 	HAL_GPIO_WritePin(L298N_IN_PORT, L298N_IN_2, GPIO_PIN_RESET);
 	HAL_GPIO_WritePin(L298N_IN_PORT, L298N_IN_3, GPIO_PIN_RESET);
 	HAL_GPIO_WritePin(L298N_IN_PORT, L298N_IN_4, GPIO_PIN_RESET);
+
+	// start timer
+	if (timEna == FALSE) {
+		HAL_TIM_Base_Start_IT(L298N_TIM_HANDLE);
+		timEna = TRUE;
+	}
 
 	// calculate timer period
 	spdMultr = (uint16_t)(L298N_TIM->ARR / 100);
