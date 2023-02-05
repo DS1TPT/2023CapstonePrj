@@ -12,6 +12,7 @@
   */
 
 #include "carebotCore.h"
+#include "opman.h"
 #include "rpicomm.h"
 #include "scheduler.h"
 #include "l298n.h"
@@ -19,21 +20,34 @@
 
 struct SerialDta rpidta;
 
-uint8_t flagTimeElapsed = FALSE;
-uint8_t flagHibernate = FALSE;
-uint8_t recvScheduleMode = FALSE;
-uint8_t initState = FALSE;
+// opcode definitions
+#define OP_SNACK_RET_MOTOR 0x01
 
-const uint8_t manRotSpd = 25;
-const uint8_t manDrvSpd = 50;
-const uint8_t defAngleA = 90; // default angle of toy motor
-const uint8_t defAngleB = 90; // default angle of snack motor
+// system properties
+const uint8_t MAN_ROT_SPD = 25;
+const uint8_t MAN_DRV_SPD = 50;
+const uint8_t DEF_ANG_A = 45; // default angle of toy motor, WRITE RETRACTED ANGLE
+const uint8_t DEF_ANG_B = 30; // default angle of snack motor
+const uint16_t OP_SNACK_RET_MOTOR_WAITING_TIME = 500;
 
-void manualDrive() {
+// derived properties
+const uint8_t TOY_ANG_DRAW = DEF_ANG_A + 90; // max angle(draw) of toy motor
+const uint8_t TOY_ANG_RETRACT = DEF_ANG_A;
+const uint8_t SNACK_ANG_RDY = DEF_ANG_B;
+const uint8_t SNACK_ANG_GIVE = DEF_ANG_B + 90;
+
+// system variables
+static uint8_t flagTimeElapsed = FALSE;
+static uint8_t flagHibernate = FALSE;
+static uint8_t recvScheduleMode = FALSE;
+static uint8_t initState = FALSE;
+static uint8_t secTimEna = FALSE;
+
+static void manualDrive() {
 	// enable motor first
 	l298n_enable();
-	sg90_enable(SG90_MOTOR_A, defAngleA);
-	sg90_enable(SG90_MOTOR_B, defAngleB);
+	sg90_enable(SG90_MOTOR_A, DEF_ANGLE_A);
+	sg90_enable(SG90_MOTOR_B, DEF_ANGLE_B);
 	while (1) {
 		if (rpi_serialDtaAvailable()) {
 			if (rpi_getSerialDta(rpidta)) {
@@ -46,32 +60,36 @@ void manualDrive() {
 					case 0x01: // left
 						l298n_setRotation(L298N_MOTOR_A, L298N_CW);
 						l298n_setRotation(L298N_MOTOR_B, L298N_CW);
-						l298n_setSpeed(L298N_MOTOR_A, manRotSpd);
-						l298n_setSpeed(L298N_MOTOR_B, manRotSpd);
+						l298n_setSpeed(L298N_MOTOR_A, MAN_ROT_SPD);
+						l298n_setSpeed(L298N_MOTOR_B, MAN_ROT_SPD);
 						break;
 					case 0x02: // right
 						l298n_setRotation(L298N_MOTOR_A, L298N_CCW);
 						l298n_setRotation(L298N_MOTOR_B, L298N_CCW);
-						l298n_setSpeed(L298N_MOTOR_A, manRotSpd);
-						l298n_setSpeed(L298N_MOTOR_B, manRotSpd);
+						l298n_setSpeed(L298N_MOTOR_A, MAN_ROT_SPD);
+						l298n_setSpeed(L298N_MOTOR_B, MAN_ROT_SPD);
 						break;
 					case 0x04: // forward
 						l298n_setRotation(L298N_MOTOR_A, L298N_CCW);
 						l298n_setRotation(L298N_MOTOR_B, L298N_CW);
-						l298n_setSpeed(L298N_MOTOR_A, manDrvSpd);
-						l298n_setSpeed(L298N_MOTOR_B, manDrvSpd);
+						l298n_setSpeed(L298N_MOTOR_A, MAN_DRV_SPD);
+						l298n_setSpeed(L298N_MOTOR_B, MAN_DRV_SPD);
 						break;
 					case 0x08: // reverse
 						l298n_setRotation(L298N_MOTOR_A, L298N_CW);
 						l298n_setRotation(L298N_MOTOR_B, L298N_CCW);
-						l298n_setSpeed(L298N_MOTOR_A, manDrvSpd);
-						l298n_setSpeed(L298N_MOTOR_B, manDrvSpd);
+						l298n_setSpeed(L298N_MOTOR_A, MAN_DRV_SPD);
+						l298n_setSpeed(L298N_MOTOR_B, MAN_DRV_SPD);
 						break;
 					case 0x10: // snack
+						sg90_setAngle(SG90_MOTOR_B, SNACK_ANG_GIVE);
+						opman_addPendingOp(OP_SNACK_RET_MOTOR, OP_SNACK_RET_MOTOR_WAITING_TIME);
 						break;
 					case 0x20: // hide toy
+						sg90_setAngle(SG90_MOTOR_A, TOY_ANG_RETRACT);
 						break;
 					case 0x40: // draw toy
+						sg90_setAngle(SG90_MOTOR_A, TOY_ANG_DRAW);
 						break;
 					case 0x80: // undefined
 						break;
@@ -88,11 +106,11 @@ void manualDrive() {
 	}
 }
 
-void autoDrive() {
+static void autoDrive() {
 	// enable motor
 	l298n_enable();
-	sg90_enable(SG90_MOTOR_A, defAngleA);
-	sg90_enable(SG90_MOTOR_B, defAngleB);
+	sg90_enable(SG90_MOTOR_A, DEF_ANGLE_A);
+	sg90_enable(SG90_MOTOR_B, DEF_ANGLE_B);
 
 	// find & call cat
 
@@ -111,7 +129,7 @@ void autoDrive() {
 	l298n_disable();
 }
 
-void coreMain() {
+static void coreMain() {
 	// check for rpi data
 	while (1) {
 		if (rpi_serialDtaAvailable()) { // process data if available
@@ -184,6 +202,7 @@ void core_start() {
 	if (initState) coreMain(); // skip initialization
 
 	// initialization
+	opman_init();
 	rpicomm_init();
 	scheduler_init();
 	l298n_init();
@@ -191,7 +210,19 @@ void core_start() {
 	initState = TRUE;
 
 	// start core
+	if (secTimEna == FALSE) { // enable timer if timer is off
+		HAL_TIM_Base_Start_IT(CORE_SEC_TIM_HANDLE);
+		secTimEna = TRUE;
+	}
 	coreMain();
+}
+
+void core_callOp(uint8_t opcode) {
+	switch (opcode) {
+	case OP_SNACK_RET_MOTOR:
+		sg90_setAngle(SG90_MOTOR_B, SNACK_ANG_RDY);
+		break;
+	}
 }
 
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
@@ -202,9 +233,13 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
 }
 
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim){
-	if (htim->Instance == TIM10)
+	if (htim->Instance == TIM10) { // 1s sys tim
 		if(scheduler_TimCallbackHandler()) flagTimeElapsed = TRUE;
 		else flagTimeElapsed = FALSE;
+	}
+	else if (htim->Instance == TIM11) { // 1ms sys tim(for postponed ops)
+		opman_callbackHandler();
+	}
 }
 
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
