@@ -15,13 +15,18 @@
 #include "main.h"
 #include "sg90.h"
 
-struct SG90Stats SG;
-float angleMultr;
-uint16_t CCRmin;
-uint16_t CCRmax;
+static struct SG90Stats SG;
+static float angleMultr;
+static uint16_t CCRmin;
+static uint16_t CCRmax;
+static uint8_t timEna = FALSE;
 
 void sg90_init() {
 	if (SG90_MOTOR_CNT < 1) return; // incorrect config
+	if (timEna == FALSE) {
+		HAL_TIM_Base_Start_IT(SG90_TIM_HANDLE);
+		timEna = TRUE;
+	}
 	CCRmin = (uint16_t)(SG90_TIM->ARR * SG90_MIN_DUTY / 100);
 	CCRmax = (uint16_t)(SG90_TIM->ARR * SG90_MAX_DUTY / 100);
 	angleMultr = (CCRmax - CCRmin) / 180.0;
