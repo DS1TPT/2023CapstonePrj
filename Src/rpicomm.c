@@ -43,9 +43,9 @@
 #include "main.h"
 #include "rpicomm.h"
 
-struct SerialDta UARTdta;
-uint8_t rxBuf[9] = { 0, };
-uint8_t txBuf[8] = { 0, };
+static struct SerialDta UARTdta;
+static uint8_t rxBuf[9] = { 0, };
+static uint8_t txBuf[8] = { 0, };
 
 int rpi_getSerialDta(struct SerialDta dest) {
 	if (UARTdta.available) { // has new received data
