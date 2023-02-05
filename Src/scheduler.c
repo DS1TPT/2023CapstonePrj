@@ -23,10 +23,10 @@ struct Time {
 	int isSet;
 };
 
-struct PatternQueue QP;
-struct Time T;
-uint8_t speed = 0; // 0 ~ 4.
-uint8_t snackNum = 0;
+static struct PatternQueue QP;
+static struct Time T;
+static uint8_t speed = 0; // 0 ~ 4.
+static uint8_t snackNum = 0;
 
 void scheduler_init() {
 	QP.count = 0;
