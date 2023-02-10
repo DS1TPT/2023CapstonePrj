@@ -19,8 +19,10 @@ struct PatternQueue {
 };
 
 struct Time {
-	int32_t sec;
-	int isSet;
+	int32_t wait;
+	int32_t duration;
+	int isSetDuration;
+	int isSetWait;
 };
 
 static struct PatternQueue QP;
@@ -33,8 +35,10 @@ void scheduler_init() {
 	for (int i = 0; i < 70; i++) {
 		QP.queue[i] = 0;
 	}
-	T.sec = 0;
-	T.isSet = FALSE;
+	T.wait = 0;
+	T.isSetWait = FALSE;
+	T.duration = 0;
+	T.isSetDuration = 0;
 	speed = 2; // initial value is normal
 	snackNum = 0;
 }
@@ -66,10 +70,20 @@ int scheduler_dequeuePattern() {
 }
 
 int scheduler_setTime(int32_t sec) {
-	if (T.isSet) return 1;
+	if (T.isSetWait) return ERR;
 	else {
-		T.isSet = TRUE;
-		T.sec = sec;
+		T.isSetWait = TRUE;
+		T.wait = sec;
+		return OK;
+	}
+}
+
+int scheduler_setDuration(int32_t sec) {
+	if (T.isSetDuration) return ERR;
+	else {
+		T.isSetDuration = TRUE;
+		T.duration = sec;
+		return OK;
 	}
 }
 
@@ -90,6 +104,10 @@ uint8_t scheduler_getSpd() {
 
 uint8_t scheduler_getSnack() {
 	return snackNum;
+}
+
+int32_t scheduler_getInterval() {
+	return (T.duration / QP.count);
 }
 
 /* ADD THIS TO MAIN.C
