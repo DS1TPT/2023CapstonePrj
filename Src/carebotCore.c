@@ -20,9 +20,6 @@
 
 struct SerialDta rpidta;
 
-// opcode definitions
-#define OP_SNACK_RET_MOTOR 0x01
-
 // system properties
 const uint8_t MAN_ROT_SPD = 25;
 const uint8_t MAN_DRV_SPD = 50;
@@ -42,6 +39,10 @@ static uint8_t flagHibernate = FALSE;
 static uint8_t recvScheduleMode = FALSE;
 static uint8_t initState = FALSE;
 static uint8_t secTimEna = FALSE;
+
+static void exePattern(int code) {
+
+}
 
 static void manualDrive() {
 	// enable motor first
@@ -107,23 +108,44 @@ static void manualDrive() {
 }
 
 static void autoDrive() {
+	uint8_t rpiPinDta = 0;
+	int32_t interval = 0;
+
+	// read some settings data
+	interval = scheduler_getInterval();
+
 	// enable motor
 	l298n_enable();
 	sg90_enable(SG90_MOTOR_A, DEF_ANGLE_A);
 	sg90_enable(SG90_MOTOR_B, DEF_ANGLE_B);
 
-	// find & call cat
+	// call & find cat
+	rpi_sendPin(RPI_PIN_O_SOUND_SEEK);
+	while (1) {
+		if (rpi_getPinDta() & RPI_PIN_I_FOUNDCAT) {
+			// do something
+			break;
+		}
+	}
 
 	// draw toy
+	sg90_setAngle(SG90_MOTOR_A, TOY_ANG_DRAW);
 
 	// play
+	while (1) {
+		// get pattern code and move robot according to dequeued code
+		exePattern(scheduler_dequeuePattern());
+
+	}
 
 	// retract toy and disable servo
-
 	sg90_disable(SG90_MOTOR_A);
 	sg90_disable(SG90_MOTOR_B);
 
 	// move away from cat(park near a wall)
+	while (1) {
+
+	}
 
 	// after parking, turn off motor
 	l298n_disable();
@@ -177,6 +199,17 @@ static void coreMain() {
 						break;
 					}
 					break;
+				case TYPE_SCHEDULE_DURATION:
+					if (!recvScheduleMode) break;
+					int32_t i32 = 0;
+					uint8_t pu8 = &i32;
+					for (int i = 0; i < 4; i++) {
+						*(pu8++) = rpidta.container[i];
+					}
+					if (scheduler_setDuration(i32) == ERR) {
+						// error
+					}
+					break;
 				case TYPE_SCHEDULE_START:
 					recvScheduleMode = TRUE;
 					break;
@@ -202,6 +235,7 @@ void core_start() {
 	if (initState) coreMain(); // skip initialization
 
 	// initialization
+	periph_init();
 	opman_init();
 	rpicomm_init();
 	scheduler_init();
@@ -223,6 +257,9 @@ void core_callOp(uint8_t opcode) {
 		sg90_setAngle(SG90_MOTOR_B, SNACK_ANG_RDY);
 		break;
 	}
+	case OP_RPI_PIN_IO_RESET:
+		rpi_opmanTimeoutHandler();
+		break;
 }
 
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
