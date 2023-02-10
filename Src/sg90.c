@@ -1,7 +1,7 @@
 /**
   *********************************************************************************************
   * NAME OF THE FILE : sg90.c
-  * BRIEF INFORMATION: Driver SW: SG90 servo motor
+  * BRIEF INFORMATION: Drive SG90 servo motor
   * 				   This program can control up to 4 SG90s with timer 1.
   *
   * Copyright (c) 2023 Lee Geon-goo.
