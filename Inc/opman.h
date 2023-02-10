@@ -17,6 +17,10 @@
 
 #include "main.h"
 
+// opcode definitions
+#define OP_SNACK_RET_MOTOR 0x01
+#define OP_RPI_PIN_IO_RESET 0x02
+
 #define OPMAN_TIM TIM11
 #define OPMAN_TIM_HANDLE &htim11
 
