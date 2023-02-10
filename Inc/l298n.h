@@ -1,7 +1,7 @@
 /**
   *********************************************************************************************
   * NAME OF THE FILE : l298n.h
-  * BRIEF INFORMATION: Driver SW: L298N DC Motor Driver
+  * BRIEF INFORMATION: Drives L298N DC Motor Driver
   *
   * Copyright (c) 2023 Lee Geon-goo.
   * All rights reserved.
