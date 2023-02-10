@@ -1,0 +1,21 @@
+PC0~3: GPIO O, L298N IN 포트
+PB6, 7: UART1, 라즈베리파이 직렬 통신
+
+PA6: TIM3 CH1
+PA7: TIM3 CH2
+
+PA0, 1: GPIO 입
+PC6: GPIO 출, 레이저
+PC7~9: GPIO 출, 주변기기
+
+PB0: ADC1 IN8
+//PB1: ADC1 IN9
+PB12~PB15: 미할당
+
+PA8: TIM1 CH1
+PA9: TIM1 CH2
+
+데이터시트에서 추출한 적외선 거리센서 수식(15~150cm)
+y: 전압, x: 거리(cm)
+y= 32.467x^-0.8504
+x = 59.88676548 / (y^1.17591721)
