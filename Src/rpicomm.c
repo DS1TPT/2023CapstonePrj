@@ -58,9 +58,9 @@ int rpi_getSerialDta(struct SerialDta dest) {
 
 uint8_t rpi_getPinDta() {
 	uint8_t dta = 0;
-	if (HAL_GPIO_ReadPin(RPI_SIG, FOUND_CAT) == GPIO_PIN_SET)
-		dta |= 1;
-	else dta &= ~0x01;
+	if (HAL_GPIO_ReadPin(RPI_PIN_IN_PORT, RPI_PIN_IN_PIN_FOUNDCAT) == GPIO_PIN_SET)
+		dta |= RPI_PIN_IO_FOUNDCAT;
+	else dta &= ~(RPI_PIN_IO_FOUNDCAT);
 	// add more code as needed
 	return dta;
 }
@@ -71,16 +71,6 @@ void rpi_init() {
 		rxBuf[i] = 0;
 	pinDta = 0;
 	HAL_UART_Receive_IT(&huart1, &rxBuf, 9);
-}
-
-void rpi_RxCpltCallbackHandler() {
-	UARTdta.available = 1; // mark available
-	UARTdta.type = rxBuf[0]; // copy data from buffer to internal var
-	for (int i = 0; i < 8; i++)
-		UARTdta.container[i] = rxBuf[i + 1];
-	for (int i = 0; i < 9; i++) // clr buf
-		rxBuf[i] = 0;
-	HAL_UART_Receive_IT(&huart1, &rxBuf, 9); // restart rx
 }
 
 int rpi_serialDtaAvailable() { // returns zero if not available
@@ -94,6 +84,20 @@ int rpi_tcpipRespond(uint8_t isErr) { // send RESP pkt to client app. returns OK
 	uint32_t txRes = HAL_UART_Transmit(&huart1, buf, 8, 20);
 	if (txRes == HAL_OK) return OK;
 	else return ERR;
+}
+
+void rpi_RxCpltCallbackHandler() {
+	UARTdta.available = 1; // mark available
+	UARTdta.type = rxBuf[0]; // copy data from buffer to internal var
+	for (int i = 0; i < 8; i++)
+		UARTdta.container[i] = rxBuf[i + 1];
+	for (int i = 0; i < 9; i++) // clr buf
+		rxBuf[i] = 0;
+	HAL_UART_Receive_IT(&huart1, &rxBuf, 9); // restart rx
+}
+
+void rpi_opmanTimeoutHandler() {
+
 }
 
 /* ADD THIS TO MAIN.C
