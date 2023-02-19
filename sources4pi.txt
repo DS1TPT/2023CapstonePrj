@@ -1,0 +1,18 @@
+라즈베리파이 파이썬 프로그램을 만들 때 참고할 수 있는 사이트들
+
+소켓통신
+https://saysimple.tistory.com/54
+https://m.blog.naver.com/PostView.naver?isHttpsRedirect=true&blogId=zeta0807&logNo=222144886241
+https://seopseop911.tistory.com/26
+
+시리얼 통신
+https://m.blog.naver.com/hahav000/221322904700
+
+OpenCV
+https://fishpoint.tistory.com/6082
+https://pythonprogramming.net/raspberry-pi-camera-opencv-face-detection-tutorial/
+https://m.blog.naver.com/PostView.naver?isHttpsRedirect=true&blogId=3demp&logNo=221441776368   (OpenCV + mjpg)
+
+GPIO
+http://lhdangerous.godohosting.com/wiki/index.php/Raspberry_pi_%EC%97%90%EC%84%9C_python%EC%9C%BC%EB%A1%9C_GPIO_%EC%82%AC%EC%9A%A9%ED%95%98%EA%B8%B0
+https://m.blog.naver.com/siryua/221232071978
