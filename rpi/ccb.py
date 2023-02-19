@@ -34,8 +34,6 @@ GPIO.setup(9, GPIO.IN, pull_up_down = GPIO.PUD_UP) #
 GPIO.output(PIN_OUT_FOUND_CAT, GPIO.LOW) # found cat
 GPIO.output(24, GPIO.LOW) # 
 GPIO.output(25, GPIO.LOW) #
-pinioScheduleExe = False
-pinioFindTimeout = False
 
 # END INIT
 
@@ -43,16 +41,7 @@ pinioFindTimeout = False
 def chkCat(): # capture cam, check if cat exists
 #https://pythonprogramming.net/raspberry-pi-camera-opencv-face-detection-tutorial/
 #https://m.blog.naver.com/PostView.naver?isHttpsRedirect=true&blogId=3demp&logNo=221441776368
-    """"
-    stream = io.BytesIO()
-    with picamera.PiCamera() as camera:
-        camera.resolution = (320, 240)
-        camera.capture(stream, format='jpeg')
-    buff = numpy.fromstring(stream.getvalue(), dtype=numpy.uint8)
-    image = cv2.imdecode(buff, 1)
-    gray = cv2.cvtColor(image,cv2.COLOR_BGR2GRAY)
-    """"
-    cap = cv2.VideoCapture("http://127.0.0.1:")
+    cap = cv2.VideoCapture("http://127.0.0.1:8080/?action=stream")
     ret, frame = cap.read()
     cascade = '/usr/local/share/OpenCV/haarcascades/haarcascade_frontalcatface.xml'
     face_cascade = cv2.CascadeClassifier(cascade)
@@ -61,20 +50,6 @@ def chkCat(): # capture cam, check if cat exists
         faces = face_cascade.detectMultiScale(gray, 1.1, 5)
         return len(faces)
     else return 0
-
-def readGPIO():
-    global pinioScheduleExe
-    pinioScheduleExe = not GPIO.input(2)
-    global pinioFindTimeout
-    pinioFindTimeout = not GPIO.input(3)
-
-def sendGPIO(pincode):
-
-def tcpipRecv():
-
-def uartRecv():
-
-def uartSend():
 
 def playAudio(number):
     # do not program this before fundamentals
@@ -104,8 +79,6 @@ def thr_conn():
                 break
             else:
                 ser.write(tcpDta)
-            
-def thr_uart():
 
 # END THREADED FUNC
 
