@@ -20,14 +20,19 @@
 
 struct SerialDta rpidta;
 
-// system properties
-const uint8_t MAN_ROT_SPD = 25;
-const uint8_t MAN_DRV_SPD = 50;
+// system properties (editable)
+const uint8_t MAN_ROT_SPD = 44; // RANGE: 6~114, EVEN NUMBER. AFFECTS AUTO SPEED
+const uint8_t MAN_DRV_SPD = 88; // RANGE: 6~114, EVEN NUMBER. AFFECTS AUTO SPEED
+const uint8_t SPD_OVERSHOOT_ADDEND = 40; // THIS NUMBER MUST NOT EXCEED: 255 - MANUAL SPEED * 2
 const uint8_t DEF_ANG_A = 45; // default angle of toy motor, WRITE RETRACTED ANGLE
 const uint8_t DEF_ANG_B = 30; // default angle of snack motor
 const uint16_t OP_SNACK_RET_MOTOR_WAITING_TIME = 500;
 
-// derived properties
+// derived properties (NOT EDITABLE)
+const uint8_t AUTO_DEF_ROT_SPD = MAN_ROT_SPD / 2;
+const uint8_t AUTO_DEF_DRV_SPD = MAN_DRV_SPD / 2;
+const uint8_t AUTO_MIN_ROT_SPD = (uint8_t)((float)AUTO_DEF_ROT_SPD / 2.0) - (((float)AUTO_DEF_ROT_SPD / 2.0 > 0) ? 0 : 1);
+const uint8_t AUTO_MIN_DRV_SPD = (uint8_t)((float)AUTO_DEF_DRV_SPD / 2.0) - (((float)AUTO_DEF_ROT_SPD / 2.0 > 0) ? 0 : 1);
 const uint8_t TOY_ANG_DRAW = DEF_ANG_A + 90; // max angle(draw) of toy motor
 const uint8_t TOY_ANG_RETRACT = DEF_ANG_A;
 const uint8_t SNACK_ANG_RDY = DEF_ANG_B;
@@ -41,7 +46,115 @@ static uint8_t initState = FALSE;
 static uint8_t secTimEna = FALSE;
 
 static void exePattern(int code) {
+	static uint8_t spdMultiplier = scheduler_getSpd();
+	static uint8_t rotSpd, drvSpd;
+	static int32_t interval = scheduler_getInterval(); // seconds
 
+	if (spdMultiplier) {
+		rotSpd = AUTO_DEF_ROT_SPD * spdMultiplier;
+		drvSpd = AUTO_DEF_DRV_SPD * spdMultiplier;
+	}
+	else {
+		rotSpd = AUTO_MIN_ROT_SPD;
+		drvSpd = AUTO_MIN_DRV_SPD;
+	}
+
+	HAL_Delay(300); // give a slight delay between patterns
+
+	switch (code) {
+	case 1: // Waltz(S-shaped route zig-zaging)
+		int32_t rptNum = interval / 3;
+		l298n_setRotation(L298N_MOTOR_A, L298N_CCW); // initial rotation
+		l298n_setRotation(L298N_MOTOR_B, L298N_CW);
+		l298n_setSpeed(L298N_MOTOR_A, AUTO_DEF_ROT_SPD); // rotation speed will not be affected by speed multiplier
+		l298n_setSpeed(L298N_MOTOR_B, AUTO_MIN_ROT_SPD);
+		HAL_Delay(500);
+		for (int32_t i32 = 0; i32 < rptNum; i32++) {
+			// forward
+			l298n_setSpeed(L298N_MOTOR_A, drvSpd);
+			l298n_setSpeed(L298N_MOTOR_B, drvSpd);
+			HAL_Delay(300);
+			l298n_setSpeed(L298N_MOTOR_A, AUTO_MIN_ROT_SPD); // rotation speed will not be affected by speed multiplier
+			l298n_setSpeed(L298N_MOTOR_B, AUTO_DEF_ROT_SPD);
+			HAL_Delay(1000);
+			l298n_setSpeed(L298N_MOTOR_A, drvSpd);
+			l298n_setSpeed(L298N_MOTOR_B, drvSpd);
+			HAL_Delay(300);
+			l298n_setSpeed(L298N_MOTOR_A, AUTO_DEF_ROT_SPD); // rotation speed will not be affected by speed multiplier
+			l298n_setSpeed(L298N_MOTOR_B, AUTO_MIN_ROT_SPD);
+			HAL_Delay(1000);
+		}
+		break;
+	case 2: // loop of Sudden accel., decel.
+		int32_t rptNum = interval / 12;
+		for (int32_t i32 = 0; i32 < rptNum; i32++) {
+			// forward
+			l298n_setRotation(L298N_MOTOR_A, L298N_CCW);
+			l298n_setRotation(L298N_MOTOR_B, L298N_CW);
+			for (int i = 0; i < 4; i++) {
+				l298n_setSpeed(L298N_MOTOR_A, drvSpd + SPD_OVERSHOOT_ADDEND);
+				l298n_setSpeed(L298N_MOTOR_B, drvSpd + SPD_OVERSHOOT_ADDEND);
+				HAL_Delay(500);
+				l298n_setSpeed(L298N_MOTOR_A, 0);
+				l298n_setSpeed(L298N_MOTOR_B, 0);
+				HAL_Delay(1000);
+			}
+			// backward
+			l298n_setRotation(L298N_MOTOR_A, L298N_CW);
+			l298n_setRotation(L298N_MOTOR_B, L298N_CCW);
+			for (int i = 0; i < 4; i++) {
+				l298n_setSpeed(L298N_MOTOR_A, drvSpd + SPD_OVERSHOOT_ADDEND);
+				l298n_setSpeed(L298N_MOTOR_B, drvSpd + SPD_OVERSHOOT_ADDEND);
+				HAL_Delay(500);
+				l298n_setSpeed(L298N_MOTOR_A, 0);
+				l298n_setSpeed(L298N_MOTOR_B, 0);
+				HAL_Delay(1000);
+			}
+
+		}
+		break;
+	case 3: // crawling, left wheel forwards a little bit, right goes next, then left goes again...
+		int32_t rptNum = interval / 10;
+		for (int32_t i32 = 0; i32 < rptNum; i32++) {
+			for (int i = 0; i < 5; i++) {
+				l298n_setRotation(L298N_MOTOR_A, L298N_CCW);
+				l298n_setRotation(L298N_MOTOR_B, L298N_STOP);
+				l298n_setSpeed(L298N_MOTOR_A, rotSpd);
+				HAL_Delay(500);
+				l298n_setRotation(L298N_MOTOR_A, L298N_STOP);
+				l298n_setRotation(L298N_MOTOR_B, L298N_CW);
+				l298n_setSpeed(L298N_MOTOR_B, rotSpd);
+				HAL_Delay(500);
+			}
+			for (int i = 0; i < 5; i++) {
+				l298n_setRotation(L298N_MOTOR_A, L298N_CW);
+				l298n_setRotation(L298N_MOTOR_B, L298N_STOP);
+				l298n_setSpeed(L298N_MOTOR_A, rotSpd);
+				HAL_Delay(500);
+				l298n_setRotation(L298N_MOTOR_A, L298N_STOP);
+				l298n_setRotation(L298N_MOTOR_B, L298N_CCW);
+				l298n_setSpeed(L298N_MOTOR_B, rotSpd);
+				HAL_Delay(500);
+			}
+		}
+		break;
+	case 4: // draw circle fast
+		break;
+	case 5: // shake the toy left and right but doesn't go anywhere
+		break;
+	case 6: // rotate, go to somewhere else, then rotate again
+		break;
+	case 7: // wait until something reaches in front of IR sensor, then flee backwards
+		break;
+	case 8: // shake the toy left and right, flee to somewhere else, then shake the toy again
+		break;
+	case 9: // stand still, move toy up and down like the robot is fishing
+		break;
+	case 0: // Auto-Decide
+		break;
+	}
+	l298n_setRotation(L298N_MOTOR_A, L298N_STOP); // stop motor rotation after each pattern exe
+	l298n_setRotation(L298N_MOTOR_B, L298N_STOP);
 }
 
 static void manualDrive() {
@@ -109,10 +222,6 @@ static void manualDrive() {
 
 static void autoDrive() {
 	uint8_t rpiPinDta = 0;
-	int32_t interval = 0;
-
-	// read some settings data
-	interval = scheduler_getInterval();
 
 	// enable motor
 	l298n_enable();
