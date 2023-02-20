@@ -208,8 +208,6 @@ static void exePattern(int code) {
 		break;
 	case 9: // stand still, move toy up and down like the robot is fishing
 		break;
-	case 0: // Auto-Decide
-		break;
 	}
 	l298n_setRotation(L298N_MOTOR_A, L298N_STOP); // stop motor rotation after each pattern exe
 	l298n_setRotation(L298N_MOTOR_B, L298N_STOP);
@@ -280,6 +278,7 @@ static void manualDrive() {
 
 static void autoDrive() {
 	uint8_t rpiPinDta = 0;
+	int patternCode = 0;
 
 	// enable motor
 	l298n_enable();
@@ -301,7 +300,13 @@ static void autoDrive() {
 	// play
 	while (1) {
 		// get pattern code and move robot according to dequeued code
-		exePattern(scheduler_dequeuePattern());
+		patternCode = scheduler_dequeuePattern();
+		if (!patternCode) { // Auto-decide
+
+		}
+		else {
+			exePattern(patternCode);
+		}
 
 	}
 
