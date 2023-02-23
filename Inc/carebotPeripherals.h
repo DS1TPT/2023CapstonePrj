@@ -31,9 +31,9 @@
 #define IR_SNSR_HANDLE &hadc1
 #define IR_SNSR_CHA ADC_CHANNEL_8
 #define IR_SNSR_POLL_TIMEOUT 20
-#define IR_SNSR_TRIG_DIST_OP 15.0
+#define IR_SNSR_TRIG_DIST_OP 20.0
 #define IR_SNSR_TRIG_DIST_FIND 40.0
-#define IR_SNSR_TRIG_DIST_SNACK 10.0
+#define IR_SNSR_TRIG_DIST_SNACK 15.0
 
 /* exported struct */
 
