@@ -28,6 +28,7 @@ const uint8_t SPD_SUBTRAHEND = 10; // THIS NUMBER MUST BE LESS THAN: MANUAL SPEE
 const uint8_t DEF_ANG_A = 45; // default angle of toy motor, WRITE RETRACTED ANGLE
 const uint8_t DEF_ANG_B = 30; // default angle of snack motor
 const uint16_t OP_SNACK_RET_MOTOR_WAITING_TIME = 500;
+const int32_t PATTERN_WAIT_AND_FLEE_WAIT_TIME = 20; // RANGE: 1 ~ 60, in seconds
 
 // derived properties (NOT EDITABLE)
 const uint8_t AUTO_DEF_ROT_SPD = MAN_ROT_SPD / 2;
@@ -36,6 +37,7 @@ const uint8_t AUTO_MIN_ROT_SPD = (uint8_t)((float)AUTO_DEF_ROT_SPD / 2.0) - (((f
 const uint8_t AUTO_MIN_DRV_SPD = (uint8_t)((float)AUTO_DEF_DRV_SPD / 2.0) - (((float)AUTO_DEF_ROT_SPD / 2.0 > 0) ? 0 : 1);
 const uint8_t SPD_OVERSHOOT_ADDEND = ((AUTO_DEF_ROT_SPD > AUTO_DEF_DRV_SPD) ? (254 - AUTO_DEF_DRV_SPD * 4) : (254 - AUTO_DEF_ROT_SPD * 4));
 const uint8_t TOY_ANG_DRAW = DEF_ANG_A + 90; // max angle(draw) of toy motor
+const uint8_t TOY_ANG_HALF = DEF_AND_A + 45; // half draw angle
 const uint8_t TOY_ANG_RETRACT = DEF_ANG_A;
 const uint8_t SNACK_ANG_RDY = DEF_ANG_B;
 const uint8_t SNACK_ANG_GIVE = DEF_ANG_B + 90;
@@ -153,27 +155,41 @@ static void exePattern(int code) {
 		}
 		break;
 	case 4: // draw circle fast
+		int32_t rptTime = interval;
+		if (rptTime < 2) rptTime = 10; // ensure execution
+		l298n_setRotation(L298N_MOTOR_A, L298N_CCW); // right
+		l298n_setRotation(L298N_MOTOR_B, L298N_CCW);
+		l298n_setSpeed(L298N_MOTOR_A, drvSpd + SPD_ADDEND);
+		l298n_setSpeed(L298N_MOTOR_B, drvSpd - SPD_SUBTRAHEND);
+		HAL_Delay(rptTime * 1000);
 		break;
 	case 5: // shake the toy left and right but doesn't go anywhere
+		// this pattern will rotate the robot faster than pattern 8
 		int32_t rptNum = interval;
 		if (rptNum < 2) rptNum = 1; // execute at least one time
 		for (int32_t i32 = 0; i32 < rptNum; i32++) {
 			l298n_setRotation(L298N_MOTOR_A, L298N_CCW); // right
 			l298n_setRotation(L298N_MOTOR_B, L298N_CCW);
-			l298n_setSpeed(L298N_MOTOR_A, rotSpd + SPD_ADDEND);
-			l298n_setSpeed(L298N_MOTOR_B, rotSpd + SPD_ADDEND);
-			HAL_Delay(300);
+			l298n_setSpeed(L298N_MOTOR_A, rotSpd + SPD_OVERSHOOT_ADDEND);
+			l298n_setSpeed(L298N_MOTOR_B, rotSpd + SPD_OVERSHOOT_ADDEND);
+			HAL_Delay(150);
+			l298n_setSpeed(L298N_MOTOR_A, rotSpd);
+			l298n_setSpeed(L298N_MOTOR_B, rotSpd);
+			HAL_Delay(150);
 			l298n_setSpeed(L298N_MOTOR_A, 0);
 			l298n_setSpeed(L298N_MOTOR_B, 0);
-			HAL_Delay(200);
+			HAL_Delay(100);
 			l298n_setRotation(L298N_MOTOR_A, L298N_CW); // left
 			l298n_setRotation(L298N_MOTOR_B, L298N_CW);
-			l298n_setSpeed(L298N_MOTOR_A, rotSpd + SPD_ADDEND);
-			l298n_setSpeed(L298N_MOTOR_B, rotSpd + SPD_ADDEND);
-			HAL_Delay(300);
+			l298n_setSpeed(L298N_MOTOR_A, rotSpd + SPD_OVERSHOOT_ADDEND);
+			l298n_setSpeed(L298N_MOTOR_B, rotSpd + SPD_OVERSHOOT_ADDEND);
+			HAL_Delay(150);
+			l298n_setSpeed(L298N_MOTOR_A, rotSpd);
+			l298n_setSpeed(L298N_MOTOR_B, rotSpd);
+			HAL_Delay(150);
 			l298n_setSpeed(L298N_MOTOR_A, 0);
 			l298n_setSpeed(L298N_MOTOR_B, 0);
-			HAL_Delay(200);
+			HAL_Delay(100);
 		}
 		break;
 	case 6: // rotate, go to somewhere else, then rotate again
@@ -203,10 +219,116 @@ static void exePattern(int code) {
 		}
 		break;
 	case 7: // wait until something reaches in front of IR sensor, then flee backwards
+		// this pattern is not affected by interval time and it'll be executed only one time
+		// if pre defined time has been elapsed, the robot will do nothing
+		int32_t cnt = PATTERN_WAIT_AND_FLEE_WAIT_TIME;
+		int i = 0;
+		while (1) {
+			if (i == 10) {
+				if (cnt <= 0) break;
+				i = 0;
+				cnt--;
+			}
+			if (periph_irSnsrChk(IR_SNSR_MODE_OP) == IR_SNSR_NEAR) {
+				l298n_setRotation(L298N_MOTOR_A, L298N_CW); // backward
+				l298n_setRotation(L298N_MOTOR_B, L298N_CCW);
+				l298n_setSpeed(L298N_MOTOR_A, drvSpd + SPD_OVERSHOOT_ADDEND);
+				l298n_setSpeed(L298N_MOTOR_B, drvSpd + SPD_OVERSHOOT_ADDEND);
+				HAL_Delay(200);
+				l298n_setSpeed(L298N_MOTOR_A, drvSpd);
+				l298n_setSpeed(L298N_MOTOR_B, drvSpd);
+				HAL_Delay(400);
+				l298n_setSpeed(L298N_MOTOR_A, 0);
+				l298n_setSpeed(L298N_MOTOR_B, 0);
+				break;
+			}
+			HAL_Delay(100);
+		}
 		break;
 	case 8: // shake the toy left and right, flee to somewhere else, then shake the toy again
+		int32_t rptNum = interval / 2;
+		if (rptNum < 2) rptNum = 1; // execute at least one time
+		for (int32_t i32 = 0; i32 < rptNum; i32++) {
+			for (int i = 0; i < 5; i++) { // shake
+				l298n_setRotation(L298N_MOTOR_A, L298N_CW); // left
+				l298n_setRotation(L298N_MOTOR_B, L298N_CW);
+				l298n_setSpeed(L298N_MOTOR_A, rotSpd + SPD_OVERSHOOT_ADDEND / 2);
+				l298n_setSpeed(L298N_MOTOR_B, rotSpd + SPD_OVERSHOOT_ADDEND / 2);
+				HAL_Delay(150);
+				l298n_setSpeed(L298N_MOTOR_A, rotSpd);
+				l298n_setSpeed(L298N_MOTOR_B, rotSpd);
+				HAL_Delay(150);
+				l298n_setSpeed(L298N_MOTOR_A, 0);
+				l298n_setSpeed(L298N_MOTOR_B, 0);
+				HAL_Delay(100);
+				l298n_setRotation(L298N_MOTOR_A, L298N_CCW); // right
+				l298n_setRotation(L298N_MOTOR_B, L298N_CCW);
+				l298n_setSpeed(L298N_MOTOR_A, rotSpd + SPD_OVERSHOOT_ADDEND / 2);
+				l298n_setSpeed(L298N_MOTOR_B, rotSpd + SPD_OVERSHOOT_ADDEND / 2);
+				HAL_Delay(150);
+				l298n_setSpeed(L298N_MOTOR_A, rotSpd);
+				l298n_setSpeed(L298N_MOTOR_B, rotSpd);
+				HAL_Delay(150);
+				l298n_setSpeed(L298N_MOTOR_A, 0);
+				l298n_setSpeed(L298N_MOTOR_B, 0);
+				HAL_Delay(100);
+			}
+			l298n_setRotation(L298N_MOTOR_A, L298N_CCW); // forward
+			l298n_setRotation(L298N_MOTOR_B, L298N_CW);
+			l298n_setSpeed(L298N_MOTOR_A, drvSpd + SPD_OVERSHOOT_ADDEND / 2);
+			l298n_setSpeed(L298N_MOTOR_B, drvSpd + SPD_OVERSHOOT_ADDEND / 2);
+			HAL_Delay(200);
+			l298n_setSpeed(L298N_MOTOR_A, drvSpd);
+			l298n_setSpeed(L298N_MOTOR_B, drvSpd);
+			HAL_Delay(300);
+			l298n_setSpeed(L298N_MOTOR_A, 0);
+			l298n_setSpeed(L298N_MOTOR_B, 0);
+			HAL_Delay(200);
+			for (int i = 0; i < 5; i++) { // shake again
+				l298n_setRotation(L298N_MOTOR_A, L298N_CW); // left
+				l298n_setRotation(L298N_MOTOR_B, L298N_CW);
+				l298n_setSpeed(L298N_MOTOR_A, rotSpd + SPD_OVERSHOOT_ADDEND / 2);
+				l298n_setSpeed(L298N_MOTOR_B, rotSpd + SPD_OVERSHOOT_ADDEND / 2);
+				HAL_Delay(150);
+				l298n_setSpeed(L298N_MOTOR_A, rotSpd);
+				l298n_setSpeed(L298N_MOTOR_B, rotSpd);
+				HAL_Delay(150);
+				l298n_setSpeed(L298N_MOTOR_A, 0);
+				l298n_setSpeed(L298N_MOTOR_B, 0);
+				HAL_Delay(100);
+				l298n_setRotation(L298N_MOTOR_A, L298N_CCW); // right
+				l298n_setRotation(L298N_MOTOR_B, L298N_CCW);
+				l298n_setSpeed(L298N_MOTOR_A, rotSpd + SPD_OVERSHOOT_ADDEND / 2);
+				l298n_setSpeed(L298N_MOTOR_B, rotSpd + SPD_OVERSHOOT_ADDEND / 2);
+				HAL_Delay(150);
+				l298n_setSpeed(L298N_MOTOR_A, rotSpd);
+				l298n_setSpeed(L298N_MOTOR_B, rotSpd);
+				HAL_Delay(150);
+				l298n_setSpeed(L298N_MOTOR_A, 0);
+				l298n_setSpeed(L298N_MOTOR_B, 0);
+				HAL_Delay(100);
+			}
+		}
 		break;
 	case 9: // stand still, move toy up and down like the robot is fishing
+		int32_t rptNum = interval / 2;
+		if (rptNum < 4) rptNum = 3; // execute at least 3 times
+		sg90_setAngle(SG90_MOTOR_A, TOY_ANG_DRAW);
+		HAL_Delay(400);
+		for (int32_t i32 = 0; i32 < rptNum; i32++) {
+			sg90_setAngle(SG90_MOTOR_A, TOY_ANG_RETRACT);
+			HAL_Delay(350);
+			sg90_setAngle(SG90_MOTOR_A, TOY_ANG_HALF);
+			HAL_Delay(300);
+			sg90_setAngle(SG90_MOTOR_A, TOY_ANG_DRAW);
+			HAL_Delay(350);
+			sg90_setAngle(SG90_MOTOR_A, TOY_ANG_RETRACT);
+			HAL_Delay(350);
+			sg90_setAngle(SG90_MOTOR_A, TOY_ANG_DRAW);
+			HAL_Delay(350);
+			sg90_setAngle(SG90_MOTOR_A, TOY_ANG_HALF);
+			HAL_Delay(300);
+		}
 		break;
 	}
 	l298n_setRotation(L298N_MOTOR_A, L298N_STOP); // stop motor rotation after each pattern exe
@@ -278,7 +400,7 @@ static void manualDrive() {
 
 static void autoDrive() {
 	uint8_t rpiPinDta = 0;
-	int patternCode = 0;
+	int patternCode = 0, patternCodePrev = 0;
 
 	// enable motor
 	l298n_enable();
@@ -300,9 +422,57 @@ static void autoDrive() {
 	// play
 	while (1) {
 		// get pattern code and move robot according to dequeued code
+		patternCodePrev = patternCode;
 		patternCode = scheduler_dequeuePattern();
 		if (!patternCode) { // Auto-decide
-
+			/*
+			 * if active pattern was executed previously, do more static ones
+			 * if not, do more active ones
+			 * every pattern will be executed with auto-decide mode only, although it's not recommended
+			 * pattern execution order for full-auto mode: 5-6-1-4-9-8-3-2-7-5-...
+			 */
+			switch (patternCodePrev) {
+			case 1: // Waltz(S-shaped route zig-zaging)
+				patternCode = 4;
+				exePattern(4);
+				break;
+			case 2: // loop of Sudden accel., decel.
+				patternCode = 7;
+				exePattern(7);
+				break;
+			case 3: // crawling, left wheel forwards a little bit, right goes next, then left goes again...
+				patternCode = 2;
+				exePattern(2);
+				break;
+			case 4: // draw circle fast
+				patternCode = 9;
+				exePattern(9);
+				break;
+			case 5: // shake the toy left and right but doesn't go anywhere
+				patternCode = 6;
+				exePattern(6);
+				break;
+			case 6: // rotate, go to somewhere else, then rotate again
+				patternCode = 1;
+				exePattern(1);
+				break;
+			case 7: // wait until something reaches in front of IR sensor, then flee backwards
+				patternCode = 5;
+				exePattern(5);
+				break;
+			case 8: // shake the toy left and right, flee to somewhere else, then shake the toy again
+				patternCode = 3;
+				exePattern(3);
+				break;
+			case 9: // stand still, move toy up and down like the robot is fishing
+				patternCode = 8;
+				exePattern(8);
+				break;
+			case 0: // if first scheduled pattern is auto decide, do code 5(shake)
+				patternCode = 5;
+				exePattern(5);
+				break;
+			}
 		}
 		else {
 			exePattern(patternCode);
