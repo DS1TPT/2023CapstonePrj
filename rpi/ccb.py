@@ -1,4 +1,3 @@
-import picamera
 import cv2
 import os
 import RPi.GPIO as GPIO
@@ -27,13 +26,16 @@ GPIO.setmode(GPIO.BCM)
 GPIO.setup(23, GPIO.OUT)
 GPIO.setup(24, GPIO.OUT)
 GPIO.setup(25, GPIO.OUT)
-GPIO.setup(PIN_IN_SCHEDULE_EXE, GPIO.IN, pull_up_down = GPIO.PUD_UP)
-GPIO.setup(PIN_IN_FIND_CAT_TIMEOUT, GPIO.IN, pull_up_down = GPIO.PUD_UP)
+GPIO.setup(PIN_IN_SCHEDULE_EXE, GPIO.IN) # physical pull up resistor is fitted on this chan
+GPIO.setup(PIN_IN_FIND_CAT_TIMEOUT, GPIO.IN) # physical pull up resistor is fitted on this chan
 GPIO.setup(PIN_IN_SCHEDULE_END, GPIO.IN, pull_up_down = GPIO.PUD_UP) #
-GPIO.setup(9, GPIO.IN, pull_up_down = GPIO.PUD_UP) #
+#GPIO.setup(9, GPIO.IN, pull_up_down = GPIO.PUD_UP) #
 GPIO.output(PIN_OUT_FOUND_CAT, GPIO.LOW) # found cat
-GPIO.output(24, GPIO.LOW) # 
-GPIO.output(25, GPIO.LOW) #
+#GPIO.output(24, GPIO.LOW) # 
+#GPIO.output(25, GPIO.LOW) #
+
+os.system("sh ~/mjpg.sh") # START MJPG STREAMER
+# COMMENT line above and execute mjpg streamer manually when debugging
 
 # END INIT
 
@@ -41,25 +43,21 @@ GPIO.output(25, GPIO.LOW) #
 def chkCat(): # capture cam, check if cat exists
 #https://pythonprogramming.net/raspberry-pi-camera-opencv-face-detection-tutorial/
 #https://m.blog.naver.com/PostView.naver?isHttpsRedirect=true&blogId=3demp&logNo=221441776368
-    cap = cv2.VideoCapture("http://127.0.0.1:8080/?action=stream")
+    cap = cv2.VideoCapture("http://127.0.0.1:9093/?action=stream")
     ret, frame = cap.read()
-    cascade = '/usr/local/share/OpenCV/haarcascades/haarcascade_frontalcatface.xml'
-    face_cascade = cv2.CascadeClassifier(cascade)
+    face_cascade = cv2.CascadeClassifier('/home/pi/cascades/haarcascade_frontalcatface.xml')
     if (ret):
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)    
         faces = face_cascade.detectMultiScale(gray, 1.1, 5)
         return len(faces)
-    else return 0
-
-def playAudio(number):
-    # do not program this before fundamentals
+    else:
+        return 0
 
 # END FUNDAMENTAL FUNC
 
 # BEGIN THREADED FUNC
 
 def thr_conn():
-    # start serial
     ser = serial.Serial('/dev/ttyAMA0', 9600, timeout=1)
     ser.open()
 
@@ -68,7 +66,7 @@ def thr_conn():
     PORT = '9903'
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDP, 1)
-    s.bind((ip, port))
+    s.bind((HOST, PORT))
     s.listen()
     while 1:
         clientSock, addr = s.accept()
@@ -99,10 +97,10 @@ def find():
 def main():
     isRun = False
     while 1:
-        if GPIO.input(PIN_IN_SCHEDULE_EXE): # schedule start
+        if GPIO.input(PIN_IN_SCHEDULE_EXE) and isRun == False: # schedule start
             isRun = True
             find()
-        elif GPIO.input(PIN_IN_SCHEDULE_END)
+        elif GPIO.input(PIN_IN_SCHEDULE_END) and isRun == True:
             isRun = False
 
 # END APP
