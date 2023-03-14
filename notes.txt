@@ -29,4 +29,5 @@ PA7: L298N, 모터B, TIM3 PWM CH2
 PC0, PC1: L298N, 모터A IN. GPIO-O
 PC2, PC3: L298N, 모터B IN. GPIO-O
 PC4, PC5: 예비. GPIO-O
-PC6~PC9: 라즈베리파이 GPIO로 출력, PC9은 미할당
+PC6~PC8: 라즈베리파이 GPIO로 출력
+PC9: 레이저
