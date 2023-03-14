@@ -23,12 +23,11 @@
 #define IR_SNSR_MODE_FIND 2
 #define IR_SNSR_MODE_SNACK 3
 // config
-#define LASER_PORT GPIO_C
+#define LASER_PORT GPIOC
 #define LASER_PIN GPIO_PIN_10
-#define LED_PORT GPIO_C
+#define LED_PORT GPIOC
 //#define LED_PIN GPIO_PIN_
 #define IR_SNSR_ADC ADC1
-#define IR_SNSR_HANDLE &hadc1
 #define IR_SNSR_CHA ADC_CHANNEL_8
 #define IR_SNSR_POLL_TIMEOUT 20
 #define IR_SNSR_TRIG_DIST_OP 20.0
@@ -40,6 +39,7 @@
 /* exported vars */
 
 /* exported func prototypes */
+void periph_setHandle(ADC_HandleTypeDef* ph);
 void periph_init();
 void periph_laser_on();
 void periph_laser_off();
