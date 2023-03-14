@@ -21,10 +21,16 @@ static uint16_t CCRmin;
 static uint16_t CCRmax;
 static uint8_t timEna = FALSE;
 
+static TIM_HandleTypeDef* pTimHandle;
+
+void sg90_setHandle(TIM_HandleTypeDef* ph) {
+	pTimHandle = ph;
+}
+
 void sg90_init() {
 	if (SG90_MOTOR_CNT < 1) return; // incorrect config
 	if (timEna == FALSE) {
-		HAL_TIM_Base_Start_IT(SG90_TIM_HANDLE);
+		HAL_TIM_Base_Start_IT(pTimHandle);
 		timEna = TRUE;
 	}
 	CCRmin = (uint16_t)(SG90_TIM->ARR * SG90_MIN_DUTY / 100);
@@ -47,20 +53,20 @@ void sg90_enable(uint8_t motorNum, uint8_t angle) { // start giving PWM signal
 
 	switch (motorNum) {
 	case SG90_MOTOR_A:
-		HAL_TIM_PWM_START(SG90_TIM_HANDLE, TIM_CHANNEL_1);
-		ena[SG90_MOTOR_A] = 1;
+		HAL_TIM_PWM_Start(pTimHandle, TIM_CHANNEL_1);
+		SG.ena[SG90_MOTOR_A] = 1;
 		break;
 	case SG90_MOTOR_B:
-		HAL_TIM_PWM_START(SG90_TIM_HANDLE, TIM_CHANNEL_2);
-		ena[SG90_MOTOR_B] = 1;
+		HAL_TIM_PWM_Start(pTimHandle, TIM_CHANNEL_2);
+		SG.ena[SG90_MOTOR_B] = 1;
 		break;
 	case SG90_MOTOR_C:
-		HAL_TIM_PWM_START(SG90_TIM_HANDLE, TIM_CHANNEL_3);
-		ena[SG90_MOTOR_C] = 1;
+		HAL_TIM_PWM_Start(pTimHandle, TIM_CHANNEL_3);
+		SG.ena[SG90_MOTOR_C] = 1;
 		break;
 	case SG90_MOTOR_D:
-		HAL_TIM_PWM_START(SG90_TIM_HANDLE, TIM_CHANNEL_4);
-		ena[SG90_MOTOR_D] = 1;
+		HAL_TIM_PWM_Start(pTimHandle, TIM_CHANNEL_4);
+		SG.ena[SG90_MOTOR_D] = 1;
 		break;
 	}
 
@@ -73,20 +79,20 @@ void sg90_disable(uint8_t motorNum) { // disable motor by stop giving PWM signal
 
 	switch (motorNum) {
 	case SG90_MOTOR_A:
-		HAL_TIM_PWM_STOP(SG90_TIM_HANDLE, TIM_CHANNEL_1);
-		ena[SG90_MOTOR_A] = 0;
+		HAL_TIM_PWM_Stop(pTimHandle, TIM_CHANNEL_1);
+		SG.ena[SG90_MOTOR_A] = 0;
 		break;
 	case SG90_MOTOR_B:
-		HAL_TIM_PWM_STOP(SG90_TIM_HANDLE, TIM_CHANNEL_2);
-		ena[SG90_MOTOR_B] = 0;
+		HAL_TIM_PWM_Stop(pTimHandle, TIM_CHANNEL_2);
+		SG.ena[SG90_MOTOR_B] = 0;
 		break;
 	case SG90_MOTOR_C:
-		HAL_TIM_PWM_STOP(SG90_TIM_HANDLE, TIM_CHANNEL_3);
-		ena[SG90_MOTOR_C] = 0;
+		HAL_TIM_PWM_Stop(pTimHandle, TIM_CHANNEL_3);
+		SG.ena[SG90_MOTOR_C] = 0;
 		break;
 	case SG90_MOTOR_D:
-		HAL_TIM_PWM_STOP(SG90_TIM_HANDLE, TIM_CHANNEL_4);
-		ena[SG90_MOTOR_D] = 0;
+		HAL_TIM_PWM_Stop(pTimHandle, TIM_CHANNEL_4);
+		SG.ena[SG90_MOTOR_D] = 0;
 		break;
 	}
 }
@@ -117,6 +123,6 @@ void sg90_setAngle(uint8_t motorNum, uint8_t angle) { // set angle
 	}
 }
 
-struct SG90Stats sg90_getStat(motor) { // get status struct data
+struct SG90Stats sg90_getStat(uint8_t motor) { // get status struct data
 	return SG;
 }
