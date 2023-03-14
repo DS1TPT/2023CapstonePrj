@@ -5,8 +5,8 @@ PA6: TIM3 CH1
 PA7: TIM3 CH2
 
 PA0, 1: GPIO 입
-PC6: GPIO 출, 레이저
-PC7~9: GPIO 출, 주변기기
+PC6~8: GPIO 출, 통신
+PC9: GPIO 출, 레이저
 
 PB0: ADC1 IN8
 //PB1: ADC1 IN9
