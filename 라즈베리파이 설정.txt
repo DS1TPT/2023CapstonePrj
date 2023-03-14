@@ -1,0 +1,8 @@
+mjpg 스트리머 포트: 9093
+
+mjpg 켜는 명령: mjpg_streamer -o "output_http_so -w ./www -p 9093" -i "input_uvc.so -r VGA -fps 10" -b
+
+mjpg.sh 파일 내용:
+export STREAMER_PATH=$HOME/mjpg/mjpg-streamer/mjpg-streamer-experimental
+export LD_LIBRARY_PATH=$STREAMER_PATH
+$STREAMER_PATH/mjpg_streamer -o "output_http.so -w $STREAMER_PATH/www -p 9093" -i "input_uvc.so -r VGA -fps 10" -b
