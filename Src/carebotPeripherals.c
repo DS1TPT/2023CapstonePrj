@@ -15,14 +15,19 @@
 #include "carebotPeripherals.h"
 #include <math.h> // to use pow()
 
+static ADC_HandleTypeDef* pAdcHandle;
 static uint32_t adcDta8 = 0;
 static float distCM = 0.0; // F411RE has single precision FPU
 static HAL_StatusTypeDef halStat;
 
+void periph_setHandle(ADC_HandleTypeDef* ph) {
+	pAdcHandle = ph;
+}
+
 void periph_init() {
 	HAL_GPIO_WritePin(LASER_PORT, LASER_PIN, GPIO_PIN_RESET);
 	//HAL_GPIO_WritePin(LED_PORT, LED_PIN, GPIO_PIN_SET);
-	HAL_ADC_Start(IR_SNSR_HANDLE);
+	HAL_ADC_Start(pAdcHandle);
 }
 
 void periph_laser_on() {
@@ -34,10 +39,10 @@ void periph_laser_off() {
 }
 
 int periph_irSnsrChk(int mode) {
-	halStat = HAL_ADC_PollForConversion(IR_SNSR_HANDLE, IR_SNSR_POLL_TIMEOUT);
+	halStat = HAL_ADC_PollForConversion(pAdcHandle, IR_SNSR_POLL_TIMEOUT);
 	if (halStat != HAL_OK) // couldn't poll
 		return IR_SNSR_ERR;
-	adcDta8 = HAL_ADC_GetValue(IR_SNSR_HANDLE); // get data
+	adcDta8 = HAL_ADC_GetValue(pAdcHandle); // get data
 	/* equation for GP2Y0A02 (y: voltage, x = cm)
 	 * y = 32.467x^-0.8504
 	 * x = 59.88676548 / (y^1.17591721)
@@ -48,15 +53,15 @@ int periph_irSnsrChk(int mode) {
 
 	switch (mode) { // decide near/far according to pre-set distance of a mode
 	case IR_SNSR_MODE_OP:
-		if (distCM <= IR_SNSR_DIST_OP) return IR_SNSR_NEAR;
+		if (distCM <= IR_SNSR_TRIG_DIST_OP) return IR_SNSR_NEAR;
 		else return IR_SNSR_FAR;
 		break;
 	case IR_SNSR_MODE_FIND:
-		if (distCM <= IR_SNSR_DIST_FIND) return IR_SNSR_NEAR;
+		if (distCM <= IR_SNSR_TRIG_DIST_FIND) return IR_SNSR_NEAR;
 		else return IR_SNSR_FAR;
 		break;
 	case IR_SNSR_MODE_SNACK:
-		if (distCM <= IR_SNSR_DIST_SNACK) return IR_SNSR_NEAR;
+		if (distCM <= IR_SNSR_TRIG_DIST_SNACK) return IR_SNSR_NEAR;
 		else return IR_SNSR_FAR;
 		break;
 	}
