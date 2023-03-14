@@ -42,10 +42,17 @@
 
 #include "main.h"
 #include "rpicomm.h"
+#include "opman.h"
+
+static UART_HandleTypeDef* pUartHandle = NULL;
 
 static struct SerialDta UARTdta;
 static uint8_t rxBuf[9] = { 0, };
-static uint8_t txBuf[8] = { 0, };
+//static uint8_t txBuf[8] = { 0, };
+
+void rpi_setHandle(UART_HandleTypeDef* ph) {
+	pUartHandle = ph;
+}
 
 int rpi_getSerialDta(struct SerialDta dest) {
 	if (UARTdta.available) { // has new received data
@@ -58,9 +65,9 @@ int rpi_getSerialDta(struct SerialDta dest) {
 
 uint8_t rpi_getPinDta() {
 	uint8_t dta = 0;
-	if (HAL_GPIO_ReadPin(RPI_PIN_IN_PORT, RPI_PIN_IN_PIN_FOUNDCAT) == GPIO_PIN_SET)
-		dta |= RPI_PIN_IO_FOUNDCAT;
-	else dta &= ~(RPI_PIN_IO_FOUNDCAT);
+	if (HAL_GPIO_ReadPin(RPI_PIN_IN_PORT, RPI_PIN_IN_FOUNDCAT) == GPIO_PIN_SET)
+		dta |= RPI_PINCODE_I_FOUNDCAT;
+	else dta &= ~(RPI_PINCODE_I_FOUNDCAT);
 	// add more code as needed
 	return dta;
 }
@@ -69,8 +76,8 @@ void rpi_init() {
 	UARTdta.available = 0;
 	for (int i = 0; i < 9; i++)
 		rxBuf[i] = 0;
-	pinDta = 0;
-	HAL_UART_Receive_IT(&huart1, &rxBuf, 9);
+	//pinDta = 0;
+	HAL_UART_Receive_IT(pUartHandle, rxBuf, 9);
 }
 
 int rpi_serialDtaAvailable() { // returns zero if not available
@@ -81,7 +88,7 @@ int rpi_tcpipRespond(uint8_t isErr) { // send RESP pkt to client app. returns OK
 	uint8_t buf[8] = { 0, };
 	buf[0] = 0xFF;
 	if (!isErr) buf[1] = 0xFF;
-	uint32_t txRes = HAL_UART_Transmit(&huart1, buf, 8, 20);
+	uint32_t txRes = HAL_UART_Transmit(pUartHandle, buf, 8, 20);
 	if (txRes == HAL_OK) return OK;
 	else return ERR;
 }
@@ -93,11 +100,29 @@ void rpi_RxCpltCallbackHandler() {
 		UARTdta.container[i] = rxBuf[i + 1];
 	for (int i = 0; i < 9; i++) // clr buf
 		rxBuf[i] = 0;
-	HAL_UART_Receive_IT(&huart1, &rxBuf, 9); // restart rx
+	HAL_UART_Receive_IT(pUartHandle, rxBuf, 9); // restart rx
+}
+
+void rpi_sendPin(int code) {
+	opman_canclePendingOp(OP_RPI_PIN_IO_SEND_RESET);
+	switch (code) {
+	case RPI_PINCODE_O_SCHEDULE_EXE:
+		HAL_GPIO_WritePin(RPI_PIN_OUT_PORT, RPI_PIN_OUT_SCHEDULE_EXE, GPIO_PIN_SET);
+		break;
+	case RPI_PINCODE_O_SCHEDULE_END:
+		HAL_GPIO_WritePin(RPI_PIN_OUT_PORT, RPI_PIN_OUT_SCHEDULE_END, GPIO_PIN_SET);
+		break;
+	case RPI_PINCODE_O_FIND_CAT_TIMEOUT:
+		HAL_GPIO_WritePin(RPI_PIN_OUT_PORT, RPI_PIN_OUT_FIND_CAT_TIMEOUT, GPIO_PIN_SET);
+		break;
+	}
+	opman_addPendingOp(OP_RPI_PIN_IO_SEND_RESET, RPI_PIN_SEND_WAITING_TIME);
 }
 
 void rpi_opmanTimeoutHandler() {
-
+	HAL_GPIO_WritePin(RPI_PIN_OUT_PORT, RPI_PIN_OUT_SCHEDULE_EXE, GPIO_PIN_RESET);
+	HAL_GPIO_WritePin(RPI_PIN_OUT_PORT, RPI_PIN_OUT_SCHEDULE_END, GPIO_PIN_RESET);
+	HAL_GPIO_WritePin(RPI_PIN_OUT_PORT, RPI_PIN_OUT_FIND_CAT_TIMEOUT, GPIO_PIN_RESET);
 }
 
 /* ADD THIS TO MAIN.C
