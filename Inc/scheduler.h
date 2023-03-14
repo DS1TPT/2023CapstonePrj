@@ -23,11 +23,12 @@
 /* exported vars */
 
 /* exported func prototypes */
+//void scheduler_setHandle(TIM_HandleTypeDef* ph);
 void scheduler_init();
 void scheduler_setSpd(uint8_t spd); // set speed of robot
-void scheduler_setTime(int32_t sec); // set time and start timer. returns OK on success, ERR on failure
-void scheduler_setDuration(int32_t sec); // set play time
-int scheduler_setSnack(uint8_t num); // set how many times the user want to give treat
+int scheduler_setTime(int32_t sec); // set time and start timer. returns OK on success, ERR on failure
+int scheduler_setDuration(int32_t sec); // set play time
+void scheduler_setSnack(uint8_t num); // set how many times the user want to give treat
 int scheduler_enqueuePattern(uint8_t code); // returns ERR if queue is full, returns OK otherwise
 int scheduler_dequeuePattern(); // returns ERR if queue is empty, returns OK otherwise
 int scheduler_TimCallbackHandler(); // returns 0 if time is not elapsed or time is not set. returns 1 if elapsed
