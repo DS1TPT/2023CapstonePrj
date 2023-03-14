@@ -18,12 +18,15 @@
 #define RPICOMM_H
 
 /* definitions */
+#define RPI_UART USART1
 
 // pinIO code and config
-#define OP_RPI_PIN_IO_SEND_WAITING_TIME 1000
-#define RPI_PIN_I_FOUNDCAT 0x01
+#define RPI_PIN_SEND_WAITING_TIME 1000
+#define RPI_PINCODE_I_FOUNDCAT 0x01
 
-#define RPI_PIN_O_SOUND_SEEK 0x01
+#define RPI_PINCODE_O_SCHEDULE_EXE 0x01
+#define RPI_PINCODE_O_SCHEDULE_END 0x02
+#define RPI_PINCODE_O_FIND_CAT_TIMEOUT 0x04
 
 // pkt header
 #define TYPE_NO 0
@@ -41,7 +44,11 @@
 
 // pin code
 #define RPI_PIN_IN_PORT GPIOA
-#define RPI_PIN_IN_PIN_FOUNDCAT GPIO_PIN_0
+#define RPI_PIN_IN_FOUNDCAT GPIO_PIN_0
+#define RPI_PIN_OUT_PORT GPIOC // Reserved: C6 ~ C9
+#define RPI_PIN_OUT_SCHEDULE_EXE GPIO_PIN_6
+#define RPI_PIN_OUT_SCHEDULE_END GPIO_PIN_7
+#define RPI_PIN_OUT_FIND_CAT_TIMEOUT GPIO_PIN_8
 
 /* exported struct */
 struct SerialDta {
@@ -54,6 +61,7 @@ struct SerialDta {
 
 
 /* exported func prototypes */
+void rpi_setHandle(UART_HandleTypeDef* ph);
 void rpi_init();
 int rpi_getSerialDta(struct SerialDta dest); // returns zero if no data is available, even though flag will be set by callback handler...
 uint8_t rpi_getPinDta();
