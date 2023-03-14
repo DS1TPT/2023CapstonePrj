@@ -25,10 +25,18 @@ struct Time {
 	int isSetWait;
 };
 
+//static TIM_HandleTypeDef* pTimHandle;
+
 static struct PatternQueue QP;
 static struct Time T;
 static uint8_t speed = 0; // 0 ~ 4.
 static uint8_t snackNum = 0;
+
+/*
+void scheduler_setHandle(TIM_HandleTypeDef* ph) {
+	timHandle = h;
+}
+*/
 
 void scheduler_init() {
 	QP.count = 0;
@@ -53,10 +61,11 @@ void scheduler_setSnack(uint8_t num) {
 
 int scheduler_enqueuePattern(uint8_t code) {
 	if (QP.count == 70) return ERR;
-	for (int i = 0; i < count - 1; i++)
+	for (int i = 0; i < QP.count - 1; i++) {
 		QP.queue[i + 1] = QP.queue[i];
-	QP.queue[i] = code;
-	QP.count++;
+		QP.queue[i] = code;
+		QP.count++;
+	}
 	return OK;
 }
 
@@ -64,8 +73,8 @@ int scheduler_dequeuePattern() {
 	if (!QP.count) return ERR;
 
 	uint8_t tmp;
-	tmp = QP.queue[count - 1];
-	QP.queue[(count--) - 1] = 0;
+	tmp = QP.queue[QP.count - 1];
+	QP.queue[(QP.count--) - 1] = 0;
 	return OK;
 }
 
@@ -88,13 +97,13 @@ int scheduler_setDuration(int32_t sec) {
 }
 
 int scheduler_TimCallbackHandler() {
-	if (T.isSet)
-		if (!(--T.sec)) return 1;
+	if (T.isSetWait)
+		if (!(--T.wait)) return 1;
 	return 0;
 }
 
 int scheduler_isSet() {
-	if (!T.isSet || !QP.count) return 0;
+	if (!T.isSetDuration || !QP.count || !T.isSetWait) return 0;
 	else return 1;
 }
 
