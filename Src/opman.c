@@ -19,6 +19,12 @@ static uint8_t opcodeMem = 0;
 static uint16_t timeMem[8] = { 0, };
 static uint8_t timEna = FALSE;
 
+TIM_HandleTypeDef* pTimHandle = NULL;
+
+void opman_setHandle(TIM_HandleTypeDef* ph) {
+	pTimHandle = ph;
+}
+
 static unsigned getBitPos(uint8_t u8) {
 	unsigned pos = 0;
 	while(1) {
@@ -40,7 +46,7 @@ void opman_addPendingOp(uint8_t opcode, uint16_t milliseconds) {
 	if (!opcode) return;
 	// add pending operation, which will be executed after n milliseconds
 	if (timEna == FALSE) { // enable timer if timer is off
-		HAL_TIM_Base_Start_IT(OPMAN_TIM_HANDLE);
+		HAL_TIM_Base_Start_IT(pTimHandle);
 		timEna = TRUE;
 	}
 	if (opcodeMem & opcode) return; // already have same operation postponed
