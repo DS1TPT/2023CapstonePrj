@@ -25,7 +25,6 @@
 
 // edit here if system configuration is changed
 #define L298N_TIM TIM3 // CAUTION: PSC, ARR, CCR use 16b val, but stm32cubeide's typedef is 32b.
-#define L298N_TIM_HANDLE &htim3
 #define L298N_IN_PORT GPIOC // C0~C3
 #define L298N_IN_1 GPIO_PIN_0
 #define L298N_IN_2 GPIO_PIN_1
@@ -47,6 +46,7 @@ struct L298nStats {
 /* exported vars */
 
 /* exported func prototypes */
+void l298n_setHandle(TIM_HandleTypeDef* ph);
 void l298n_init();
 void l298n_enable(); // enable motor operation. This starts PWM generation
 void l298n_disable(); // implies setRotation( , STOP): disable motor operation. This stops PWM generation
