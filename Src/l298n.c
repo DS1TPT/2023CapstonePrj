@@ -20,6 +20,12 @@ static uint16_t spd16a;
 static uint16_t spd16b;
 static uint8_t timEna = FALSE;
 
+static TIM_HandleTypeDef* pTimHandle = NULL;
+
+void l298n_setHandle(TIM_HandleTypeDef* ph) {
+	pTimHandle = ph;
+}
+
 void l298n_init() {
 	// init status struct
 	L298Nstat.ena = FALSE;
@@ -38,7 +44,7 @@ void l298n_init() {
 
 	// start timer
 	if (timEna == FALSE) {
-		HAL_TIM_Base_Start_IT(L298N_TIM_HANDLE);
+		HAL_TIM_Base_Start_IT(pTimHandle);
 		timEna = TRUE;
 	}
 
@@ -52,8 +58,8 @@ void l298n_init() {
 
 void l298n_enable() { // enable motor operation. This starts PWM generation.
 	if (L298Nstat.ena == TRUE) return;
-	HAL_TIM_PWM_START(L298N_TIM_HANDLE, TIM_CHANNEL_1);
-	HAL_TIM_PWM_START(L298N_TIM_HANDLE, TIM_CHANNEL_2);
+	HAL_TIM_PWM_Start(pTimHandle, TIM_CHANNEL_1);
+	HAL_TIM_PWM_Start(pTimHandle, TIM_CHANNEL_2);
 	L298Nstat.ena = TRUE;
 }
 
@@ -62,8 +68,8 @@ void l298n_disable() { // implies setRotation( , STOP): disable motor operation.
 
 	l298n_setRotation(L298N_MOTOR_A, L298N_STOP);
 	l298n_setRotation(L298N_MOTOR_B, L298N_STOP);
-	HAL_TIM_PWM_STOP(L298N_TIM_HANDLE, TIM_CHANNEL_1);
-	HAL_TIM_PWM_STOP(L298N_TIM_HANDLE, TIM_CHANNEL_2);
+	HAL_TIM_PWM_Stop(pTimHandle, TIM_CHANNEL_1);
+	HAL_TIM_PWM_Stop(pTimHandle, TIM_CHANNEL_2);
 	L298Nstat.ena = FALSE;
 }
 
