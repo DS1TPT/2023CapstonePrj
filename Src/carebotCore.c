@@ -12,6 +12,7 @@
   */
 
 #include "carebotCore.h"
+#include "carebotPeripherals.h"
 #include "opman.h"
 #include "rpicomm.h"
 #include "scheduler.h"
@@ -37,23 +38,32 @@ const uint8_t AUTO_MIN_ROT_SPD = (uint8_t)((float)AUTO_DEF_ROT_SPD / 2.0) - (((f
 const uint8_t AUTO_MIN_DRV_SPD = (uint8_t)((float)AUTO_DEF_DRV_SPD / 2.0) - (((float)AUTO_DEF_ROT_SPD / 2.0 > 0) ? 0 : 1);
 const uint8_t SPD_OVERSHOOT_ADDEND = ((AUTO_DEF_ROT_SPD > AUTO_DEF_DRV_SPD) ? (254 - AUTO_DEF_DRV_SPD * 4) : (254 - AUTO_DEF_ROT_SPD * 4));
 const uint8_t TOY_ANG_DRAW = DEF_ANG_A + 90; // max angle(draw) of toy motor
-const uint8_t TOY_ANG_HALF = DEF_AND_A + 45; // half draw angle
+const uint8_t TOY_ANG_HALF = DEF_ANG_A + 45; // half draw angle
 const uint8_t TOY_ANG_RETRACT = DEF_ANG_A;
 const uint8_t SNACK_ANG_RDY = DEF_ANG_B;
 const uint8_t SNACK_ANG_GIVE = DEF_ANG_B + 90;
 
 // system variables
 static uint8_t flagTimeElapsed = FALSE;
-static uint8_t flagHibernate = FALSE;
+//static uint8_t flagHibernate = FALSE;
 static uint8_t flagAutorun = FALSE;
 static uint8_t recvScheduleMode = FALSE;
 static uint8_t initState = FALSE;
 static uint8_t secTimEna = FALSE;
 
+static TIM_HandleTypeDef* pTimHandle = NULL;
+
 static void exePattern(int code) {
-	static uint8_t spdMultiplier = scheduler_getSpd();
-	static uint8_t rotSpd, drvSpd;
-	static int32_t interval = scheduler_getInterval(); // seconds
+	uint8_t spdMultiplier = 0;
+	uint8_t rotSpd, drvSpd;
+	int32_t interval = 0; // seconds
+	int32_t rptNum = 1;
+	int32_t rptTime = 1;
+	int32_t cnt = 0;
+
+	spdMultiplier = scheduler_getSpd();
+	interval = scheduler_getInterval();
+
 
 	if (!flagAutorun) interval = 1;
 
@@ -70,7 +80,7 @@ static void exePattern(int code) {
 
 	switch (code) {
 	case 1: // Waltz(S-shaped route zig-zaging)
-		int32_t rptNum = interval / 3;
+		rptNum = interval / 3;
 		if (rptNum < 2) rptNum = 1; // execute at least one time
 		l298n_setRotation(L298N_MOTOR_A, L298N_CCW); // initial rotation
 		l298n_setRotation(L298N_MOTOR_B, L298N_CW);
@@ -94,7 +104,7 @@ static void exePattern(int code) {
 		}
 		break;
 	case 2: // loop of Sudden accel., decel.
-		int32_t rptNum = interval / 12;
+		rptNum = interval / 12;
 		if (rptNum < 2) rptNum = 1; // execute at least one time
 		for (int32_t i32 = 0; i32 < rptNum; i32++) {
 			// forward
@@ -129,7 +139,7 @@ static void exePattern(int code) {
 		}
 		break;
 	case 3: // crawling, left wheel forwards a little bit, right goes next, then left goes again...
-		int32_t rptNum = interval / 10;
+		rptNum = interval / 10;
 		if (rptNum < 2) rptNum = 1; /// execute at least one time
 		for (int32_t i32 = 0; i32 < rptNum; i32++) {
 			for (int i = 0; i < 5; i++) {
@@ -155,7 +165,7 @@ static void exePattern(int code) {
 		}
 		break;
 	case 4: // draw circle fast
-		int32_t rptTime = interval;
+		rptTime = interval;
 		if (rptTime < 2) rptTime = 10; // ensure execution
 		l298n_setRotation(L298N_MOTOR_A, L298N_CCW); // right
 		l298n_setRotation(L298N_MOTOR_B, L298N_CCW);
@@ -165,7 +175,7 @@ static void exePattern(int code) {
 		break;
 	case 5: // shake the toy left and right but doesn't go anywhere
 		// this pattern will rotate the robot faster than pattern 8
-		int32_t rptNum = interval;
+		rptNum = interval;
 		if (rptNum < 2) rptNum = 1; // execute at least one time
 		for (int32_t i32 = 0; i32 < rptNum; i32++) {
 			l298n_setRotation(L298N_MOTOR_A, L298N_CCW); // right
@@ -193,7 +203,7 @@ static void exePattern(int code) {
 		}
 		break;
 	case 6: // rotate, go to somewhere else, then rotate again
-		int32_t rptNum = interval / 6;
+		rptNum = interval / 6;
 		if (rptNum < 2) rptNum = 1; // execute at least one time
 		for (int32_t i32 = 0; i32 < rptNum; i32++) {
 			l298n_setRotation(L298N_MOTOR_A, L298N_CCW); // right
@@ -221,7 +231,7 @@ static void exePattern(int code) {
 	case 7: // wait until something reaches in front of IR sensor, then flee backwards
 		// this pattern is not affected by interval time and it'll be executed only one time
 		// if pre defined time has been elapsed, the robot will do nothing
-		int32_t cnt = PATTERN_WAIT_AND_FLEE_WAIT_TIME;
+		cnt = PATTERN_WAIT_AND_FLEE_WAIT_TIME;
 		int i = 0;
 		while (1) {
 			if (i == 10) {
@@ -246,7 +256,7 @@ static void exePattern(int code) {
 		}
 		break;
 	case 8: // shake the toy left and right, flee to somewhere else, then shake the toy again
-		int32_t rptNum = interval / 2;
+		rptNum = interval / 2;
 		if (rptNum < 2) rptNum = 1; // execute at least one time
 		for (int32_t i32 = 0; i32 < rptNum; i32++) {
 			for (int i = 0; i < 5; i++) { // shake
@@ -311,7 +321,7 @@ static void exePattern(int code) {
 		}
 		break;
 	case 9: // stand still, move toy up and down like the robot is fishing
-		int32_t rptNum = interval / 2;
+		rptNum = interval / 2;
 		if (rptNum < 4) rptNum = 3; // execute at least 3 times
 		sg90_setAngle(SG90_MOTOR_A, TOY_ANG_DRAW);
 		HAL_Delay(400);
@@ -338,8 +348,8 @@ static void exePattern(int code) {
 static void manualDrive() {
 	// enable motor first
 	l298n_enable();
-	sg90_enable(SG90_MOTOR_A, DEF_ANGLE_A);
-	sg90_enable(SG90_MOTOR_B, DEF_ANGLE_B);
+	sg90_enable(SG90_MOTOR_A, DEF_ANG_A);
+	sg90_enable(SG90_MOTOR_B, DEF_ANG_B);
 	while (1) {
 		if (rpi_serialDtaAvailable()) {
 			if (rpi_getSerialDta(rpidta)) {
@@ -399,18 +409,18 @@ static void manualDrive() {
 }
 
 static void autoDrive() {
-	uint8_t rpiPinDta = 0;
+	//uint8_t rpiPinDta = 0;
 	int patternCode = 0, patternCodePrev = 0;
 
 	// enable motor
 	l298n_enable();
-	sg90_enable(SG90_MOTOR_A, DEF_ANGLE_A);
-	sg90_enable(SG90_MOTOR_B, DEF_ANGLE_B);
+	sg90_enable(SG90_MOTOR_A, DEF_ANG_A);
+	sg90_enable(SG90_MOTOR_B, DEF_ANG_B);
 
 	// call & find cat
-	rpi_sendPin(RPI_PIN_O_SOUND_SEEK);
+	rpi_sendPin(RPI_PINCODE_O_SCHEDULE_EXE);
 	while (1) {
-		if (rpi_getPinDta() & RPI_PIN_I_FOUNDCAT) {
+		if (rpi_getPinDta() & RPI_PINCODE_I_FOUNDCAT) {
 			// do something
 			break;
 		}
@@ -494,6 +504,8 @@ static void autoDrive() {
 }
 
 static void coreMain() {
+	int32_t i32 = 0;
+	uint8_t* pu8 = 0;
 	// check for rpi data
 	while (1) {
 		if (rpi_serialDtaAvailable()) { // process data if available
@@ -505,8 +517,8 @@ static void coreMain() {
 					break;
 				case TYPE_SCHEDULE_TIME:
 					if (!recvScheduleMode) break;
-					int32_t i32 = 0;
-					uint8_t pu8 = &i32;
+					i32 = 0;
+					pu8 = &i32;
 					for (int i = 0; i < 4; i++) {
 						*(pu8++) = rpidta.container[i];
 					}
@@ -537,14 +549,15 @@ static void coreMain() {
 						manualDrive();
 						break;
 					case 0xFF: // initialize whole system
-						coreRestart();
+						// not yet implemented
+						//core_restart();
 						break;
 					}
 					break;
 				case TYPE_SCHEDULE_DURATION:
 					if (!recvScheduleMode) break;
-					int32_t i32 = 0;
-					uint8_t pu8 = &i32;
+					i32 = 0;
+					pu8 = &i32;
 					for (int i = 0; i < 4; i++) {
 						*(pu8++) = rpidta.container[i];
 					}
@@ -555,7 +568,7 @@ static void coreMain() {
 				case TYPE_SCHEDULE_START:
 					recvScheduleMode = TRUE;
 					break;
-				case TYPE_SCHEDULE_STOP:
+				case TYPE_SCHEDULE_END:
 					recvScheduleMode = FALSE;
 				}
 
@@ -575,13 +588,17 @@ static void coreMain() {
 	}
 }
 
+void core_setHandle(TIM_HandleTypeDef* ph) {
+
+}
+
 void core_start() {
 	if (initState) coreMain(); // skip initialization
 
 	// initialization
 	periph_init();
 	opman_init();
-	rpicomm_init();
+	rpi_init();
 	scheduler_init();
 	l298n_init();
 	sg90_init();
@@ -589,7 +606,7 @@ void core_start() {
 
 	// start core
 	if (secTimEna == FALSE) { // enable timer if timer is off
-		HAL_TIM_Base_Start_IT(CORE_SEC_TIM_HANDLE);
+		HAL_TIM_Base_Start_IT(pTimHandle);
 		secTimEna = TRUE;
 	}
 	coreMain();
@@ -600,10 +617,10 @@ void core_callOp(uint8_t opcode) {
 	case OP_SNACK_RET_MOTOR:
 		sg90_setAngle(SG90_MOTOR_B, SNACK_ANG_RDY);
 		break;
-	}
-	case OP_RPI_PIN_IO_RESET:
+	case OP_RPI_PIN_IO_SEND_RESET:
 		rpi_opmanTimeoutHandler();
 		break;
+	}
 }
 
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
