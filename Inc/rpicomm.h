@@ -18,29 +18,27 @@
 #define RPICOMM_H
 
 /* definitions */
-#define RPI_UART USART1
 
 // pinIO code and config
 #define RPI_PIN_SEND_WAITING_TIME 1000
-#define RPI_PINCODE_I_FOUNDCAT 0x01
+#define DTA_LEN 8
 
+#define RPI_PINCODE_I_FOUNDCAT 0x01
 #define RPI_PINCODE_O_SCHEDULE_EXE 0x01
 #define RPI_PINCODE_O_SCHEDULE_END 0x02
 #define RPI_PINCODE_O_FIND_CAT_TIMEOUT 0x04
 
-// pkt header
-#define TYPE_NO 0
-#define TYPE_CONN 1
-#define TYPE_SCHEDULE_TIME 2
-#define TYPE_SCHEDULE_PATTERN 4
-#define TYPE_SCHEDULE_SNACK 8
-#define TYPE_SCHEDULE_SPEED 0x10
-#define TYPE_SYS 0x20
-#define TYPE_MANUAL_CTRL 0x40
-#define TYPE_SCHEDULE_DURATION 0x80
-#define TYPE_SCHEDULE_START 0xAA
-#define TYPE_SCHEDULE_END 0x55
-#define TYPE_RESP 0xFF
+// Data type header definitions
+#define TYPE_SCHEDULE_TIME 'T'
+#define TYPE_SCHEDULE_PATTERN 'P'
+#define TYPE_SCHEDULE_SNACK_INTERVAL 'N'
+#define TYPE_SCHEDULE_SPEED 'V'
+#define TYPE_SYS '!'
+#define TYPE_MANUAL_CTRL 'M'
+#define TYPE_SCHEDULE_DURATION 'D'
+#define TYPE_SCHEDULE_START '<'
+#define TYPE_SCHEDULE_END '>'
+//#define TYPE_RESP 0xFF
 
 // pin code
 #define RPI_PIN_IN_PORT GPIOA
@@ -63,11 +61,11 @@ struct SerialDta {
 /* exported func prototypes */
 void rpi_setHandle(UART_HandleTypeDef* ph);
 void rpi_init();
-int rpi_getSerialDta(struct SerialDta dest); // returns zero if no data is available, even though flag will be set by callback handler...
+int rpi_getSerialDta(struct SerialDta* pDest); // returns zero if no data is available, even though flag will be set by callback handler...
 uint8_t rpi_getPinDta();
 void rpi_sendPin(int code);
 int rpi_serialDtaAvailable(); // returns zero if not available
-int rpi_tcpipRespond(uint8_t isErr); // send RESP pkt to client app. returns 0 on success
+//int rpi_tcpipRespond(uint8_t isErr); // send RESP pkt to client app. returns 0 on success
 
 void rpi_RxCpltCallbackHandler();
 void rpi_opmanTimeoutHandler();
