@@ -21,7 +21,6 @@ tcpDta = 0
 
 # GPIO 23, 24, 25 is OUTPUT
 # GPIO 02, 03, 08, 09 is INPUT(pull-up)
-#http://lhdangerous.godohosting.com/wiki/index.php/Raspberry_pi_%EC%97%90%EC%84%9C_python%EC%9C%BC%EB%A1%9C_GPIO_%EC%82%AC%EC%9A%A9%ED%95%98%EA%B8%B0
 GPIO.setmode(GPIO.BCM)
 GPIO.setup(23, GPIO.OUT)
 GPIO.setup(24, GPIO.OUT)
@@ -41,8 +40,6 @@ os.system("sh ~/mjpg.sh") # START MJPG STREAMER
 
 # BEGIN FUNDAMENTAL FUNC
 def chkCat(): # capture cam, check if cat exists
-#https://pythonprogramming.net/raspberry-pi-camera-opencv-face-detection-tutorial/
-#https://m.blog.naver.com/PostView.naver?isHttpsRedirect=true&blogId=3demp&logNo=221441776368
     cap = cv2.VideoCapture("http://127.0.0.1:9093/?action=stream")
     ret, frame = cap.read()
     face_cascade = cv2.CascadeClassifier('/home/pi/cascades/haarcascade_frontalcatface.xml')
@@ -59,13 +56,13 @@ def chkCat(): # capture cam, check if cat exists
 
 def thr_conn():
     ser = serial.Serial('/dev/ttyAMA0', 9600, timeout=1)
+    ser.close()
+    time.sleep(2)
     ser.open()
 
-    #https://m.blog.naver.com/PostView.naver?isHttpsRedirect=true&blogId=zeta0807&logNo=222144886241
     HOST = '192.168.1.9'
-    PORT = '9903'
+    PORT = 9903
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDP, 1)
     s.bind((HOST, PORT))
     s.listen()
     while 1:
@@ -106,5 +103,7 @@ def main():
 # END APP
 
 # EXECUTE APP
+thr_1 = threading.Thread(target = thr_conn)
+thr_1.start()
 while 1:
     main()
