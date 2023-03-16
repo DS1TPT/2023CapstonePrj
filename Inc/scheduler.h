@@ -1,8 +1,7 @@
 /**
   *********************************************************************************************
-  * NAME OF THE FILE : sg90.h
-  * BRIEF INFORMATION: Driver SW: SG90 servo motor
-  * 				   This program can control up to 4 SG90s with timer 1.
+  * NAME OF THE FILE : scheduler.c
+  * BRIEF INFORMATION: auto-play schedule manager
   *
   * Copyright (c) 2023 Lee Geon-goo.
   * All rights reserved.
@@ -12,41 +11,30 @@
   *********************************************************************************************
   */
 
-#ifndef SG90_H
-#define SG90_H
+#ifndef SCHEDULER_H
+#define SCHEDULER_H
 
-/* definitions */
-// DO NOT EDIT
-#define SG90_MOTOR_A 0
-#define SG90_MOTOR_B 1
-#define SG90_MOTOR_C 2
-#define SG90_MOTOR_D 3
-#define SG90_MIN_DUTY 5
-#define SG90_MAX_DUTY 10
-
-// edit here if system configuration is changed
-#define SG90_TIM TIM1 // CAUTION: PSC, ARR, CCR use 16b val, but stm32cubeide's typedef is 32b.
-#define SG90_MOTOR_CNT 2
-#define SG90_PWM_PORT GPIOA // A8, A9
-#define SG90_PWM_A GPIO_PIN_8 // CH1
-#define SG90_PWM_B GPIO_PIN_9 // CH2
-//#define SG90_PWM_C GPIO_PIN_ // CH3
-//#define SG90_PWM_D GPIO_PIN_ // CH4
+/* includes */
+#include "main.h"
+//#include "rpicomm.h"
 
 /* exported struct */
-struct SG90Stats {
-	uint8_t ena[SG90_MOTOR_CNT];
-	uint8_t angle[SG90_MOTOR_CNT];
-};
 
 /* exported vars */
 
 /* exported func prototypes */
-void sg90_setHandle(TIM_HandleTypeDef* ph);
-void sg90_init();
-void sg90_enable(uint8_t motorNum, uint8_t angle); // start giving PWM signal
-void sg90_disable(uint8_t motorNum); // disable motor by stop giving PWM signal
-void sg90_setAngle(uint8_t motorNum, uint8_t angle); // set angle
-struct SG90Stats sg90_getStat(uint8_t motor); // get status struct data
+//void scheduler_setHandle(TIM_HandleTypeDef* ph);
+void scheduler_init();
+void scheduler_setSpd(uint8_t spd); // set speed of robot
+int scheduler_setTime(int32_t sec); // set time and start timer. returns OK on success, ERR on failure
+int scheduler_setDuration(int32_t sec); // set play time
+void scheduler_setSnack(uint8_t num); // set how many times the user want to give treat
+int scheduler_enqueuePattern(uint8_t code); // returns ERR if queue is full, returns OK otherwise
+int scheduler_dequeuePattern(); // returns ERR if queue is empty, returns OK otherwise
+int scheduler_TimCallbackHandler(); // returns 0 if time is not elapsed or time is not set. returns 1 if elapsed
+int scheduler_isSet(); // check if schedule is set and complete, returns 0 if schedule is not set
+uint8_t scheduler_getSpd(); // return speed to core
+uint8_t scheduler_getSnack(); // return how many times the user want to give treat to core
+int32_t scheduler_getInterval(); // return interval time between patterns
 
 #endif
