@@ -21,6 +21,12 @@
 
 struct SerialDta rpidta;
 
+#define PATTERN_EXE_MODE_AUTO 0
+#define PATTERN_EXE_MODE_MAN 1
+
+// for testing this to test connection(received uart data will be sent to debug uart port)
+#define _TEST_CONNECTION_ENABLED
+
 // system properties (editable)
 const uint8_t MAN_ROT_SPD = 44; // RANGE: 6~114, EVEN NUMBER. AFFECTS AUTO SPEED
 const uint8_t MAN_DRV_SPD = 88; // RANGE: 6~114, EVEN NUMBER. AFFECTS AUTO SPEED
@@ -52,31 +58,60 @@ static uint8_t initState = FALSE;
 static uint8_t secTimEna = FALSE;
 
 static TIM_HandleTypeDef* pTimHandle = NULL;
+static UART_HandleTypeDef* pDbgUartHandle = NULL;
 
-static void exePattern(int code) {
+int32_t atoi32(uint8_t* str) {
+    int32_t result, positive;
+
+    result = 0;
+    positive = 1;
+    while (( 9 <= *str && *str <= 13) || *str == ' ')
+        str++;
+    if (*str == '+' || *str == '-') {
+        if (*str == '-')
+            positive = -1;
+        str++;
+    }
+    while ('0' <= *str && *str <= '9') {
+        result *= 10;
+        result += (*str - '0') * positive;
+        str++;
+    }
+    return result;
+}
+
+
+static void exePattern(int code, int mode) {
 	uint8_t spdMultiplier = 0;
 	uint8_t rotSpd, drvSpd;
 	int32_t interval = 0; // seconds
 	int32_t rptNum = 1;
 	int32_t rptTime = 1;
 	int32_t cnt = 0;
+	if (mode == PATTERN_EXE_MODE_AUTO) {
+		spdMultiplier = scheduler_getSpd();
+		interval = scheduler_getInterval();
 
-	spdMultiplier = scheduler_getSpd();
-	interval = scheduler_getInterval();
+		if (!flagAutorun) interval = 1;
 
+		if (spdMultiplier) {
+			rotSpd = AUTO_DEF_ROT_SPD * spdMultiplier;
+			drvSpd = AUTO_DEF_DRV_SPD * spdMultiplier;
+		}
+		else {
+			rotSpd = AUTO_MIN_ROT_SPD;
+			drvSpd = AUTO_MIN_DRV_SPD;
+		}
 
-	if (!flagAutorun) interval = 1;
-
-	if (spdMultiplier) {
+		HAL_Delay(300); // give a slight delay between patterns
+	}
+	else if (mode == PATTERN_EXE_MODE_MAN) {
+		spdMultiplier = 2;
+		interval = 1;
+		cnt = 0;
 		rotSpd = AUTO_DEF_ROT_SPD * spdMultiplier;
 		drvSpd = AUTO_DEF_DRV_SPD * spdMultiplier;
 	}
-	else {
-		rotSpd = AUTO_MIN_ROT_SPD;
-		drvSpd = AUTO_MIN_DRV_SPD;
-	}
-
-	HAL_Delay(300); // give a slight delay between patterns
 
 	switch (code) {
 	case 1: // Waltz(S-shaped route zig-zaging)
@@ -320,24 +355,12 @@ static void exePattern(int code) {
 			}
 		}
 		break;
-	case 9: // stand still, move toy up and down like the robot is fishing
+	case 9: // stand still, move toy left and right like the robot is fishing horizontally
 		rptNum = interval / 2;
 		if (rptNum < 4) rptNum = 3; // execute at least 3 times
-		sg90_setAngle(SG90_MOTOR_A, TOY_ANG_DRAW);
 		HAL_Delay(400);
 		for (int32_t i32 = 0; i32 < rptNum; i32++) {
-			sg90_setAngle(SG90_MOTOR_A, TOY_ANG_RETRACT);
-			HAL_Delay(350);
-			sg90_setAngle(SG90_MOTOR_A, TOY_ANG_HALF);
-			HAL_Delay(300);
-			sg90_setAngle(SG90_MOTOR_A, TOY_ANG_DRAW);
-			HAL_Delay(350);
-			sg90_setAngle(SG90_MOTOR_A, TOY_ANG_RETRACT);
-			HAL_Delay(350);
-			sg90_setAngle(SG90_MOTOR_A, TOY_ANG_DRAW);
-			HAL_Delay(350);
-			sg90_setAngle(SG90_MOTOR_A, TOY_ANG_HALF);
-			HAL_Delay(300);
+			// implementation here
 		}
 		break;
 	}
@@ -352,49 +375,42 @@ static void manualDrive() {
 	sg90_enable(SG90_MOTOR_B, DEF_ANG_B);
 	while (1) {
 		if (rpi_serialDtaAvailable()) {
-			if (rpi_getSerialDta(rpidta)) {
-				if (rpidta.type == TYPE_MANUAL_CTRL) {
-					switch (rpidta.container[0]) {
-					case 0x00: // stop
+			if (rpi_getSerialDta(&rpidta)) {
+				if (rpidta.type == TYPE_MANUAL_CTRL && rpidta.container[0] == '0') {
+					switch (rpidta.container[1]) {
+					case '0': // stop
 						l298n_setRotation(L298N_MOTOR_A, L298N_STOP);
 						l298n_setRotation(L298N_MOTOR_B, L298N_STOP);
 						break;
-					case 0x01: // left
+					case '3': // left
 						l298n_setRotation(L298N_MOTOR_A, L298N_CW);
 						l298n_setRotation(L298N_MOTOR_B, L298N_CW);
 						l298n_setSpeed(L298N_MOTOR_A, MAN_ROT_SPD);
 						l298n_setSpeed(L298N_MOTOR_B, MAN_ROT_SPD);
 						break;
-					case 0x02: // right
+					case '4': // right
 						l298n_setRotation(L298N_MOTOR_A, L298N_CCW);
 						l298n_setRotation(L298N_MOTOR_B, L298N_CCW);
 						l298n_setSpeed(L298N_MOTOR_A, MAN_ROT_SPD);
 						l298n_setSpeed(L298N_MOTOR_B, MAN_ROT_SPD);
 						break;
-					case 0x04: // forward
+					case '1': // forward
 						l298n_setRotation(L298N_MOTOR_A, L298N_CCW);
 						l298n_setRotation(L298N_MOTOR_B, L298N_CW);
 						l298n_setSpeed(L298N_MOTOR_A, MAN_DRV_SPD);
 						l298n_setSpeed(L298N_MOTOR_B, MAN_DRV_SPD);
 						break;
-					case 0x08: // reverse
+					case '2': // reverse
 						l298n_setRotation(L298N_MOTOR_A, L298N_CW);
 						l298n_setRotation(L298N_MOTOR_B, L298N_CCW);
 						l298n_setSpeed(L298N_MOTOR_A, MAN_DRV_SPD);
 						l298n_setSpeed(L298N_MOTOR_B, MAN_DRV_SPD);
 						break;
-					case 0x10: // snack
-						sg90_setAngle(SG90_MOTOR_B, SNACK_ANG_GIVE);
-						opman_addPendingOp(OP_SNACK_RET_MOTOR, OP_SNACK_RET_MOTOR_WAITING_TIME);
-						break;
-					case 0x20: // hide toy
-						sg90_setAngle(SG90_MOTOR_A, TOY_ANG_RETRACT);
-						break;
-					case 0x40: // draw toy
-						sg90_setAngle(SG90_MOTOR_A, TOY_ANG_DRAW);
-						break;
-					case 0x80: // undefined
-						break;
+					}
+				}
+				else if (rpidta.type == TYPE_MANUAL_CTRL && rpidta.container[0] != '0') {
+					if (rpidta.container[0] == 'P') {
+
 					}
 				}
 				else if (rpidta.type == TYPE_SYS && rpidta.container[0] == 2) {
@@ -414,7 +430,7 @@ static void autoDrive() {
 
 	// enable motor
 	l298n_enable();
-	sg90_enable(SG90_MOTOR_A, DEF_ANG_A);
+	//sg90_enable(SG90_MOTOR_A, DEF_ANG_A);
 	sg90_enable(SG90_MOTOR_B, DEF_ANG_B);
 
 	// call & find cat
@@ -427,7 +443,7 @@ static void autoDrive() {
 	}
 
 	// draw toy
-	sg90_setAngle(SG90_MOTOR_A, TOY_ANG_DRAW);
+	// sg90_setAngle(SG90_MOTOR_A, TOY_ANG_DRAW);
 
 	// play
 	while (1) {
@@ -444,54 +460,54 @@ static void autoDrive() {
 			switch (patternCodePrev) {
 			case 1: // Waltz(S-shaped route zig-zaging)
 				patternCode = 4;
-				exePattern(4);
+				exePattern(4, PATTERN_EXE_MODE_AUTO);
 				break;
 			case 2: // loop of Sudden accel., decel.
 				patternCode = 7;
-				exePattern(7);
+				exePattern(7, PATTERN_EXE_MODE_AUTO);
 				break;
 			case 3: // crawling, left wheel forwards a little bit, right goes next, then left goes again...
 				patternCode = 2;
-				exePattern(2);
+				exePattern(2, PATTERN_EXE_MODE_AUTO);
 				break;
 			case 4: // draw circle fast
 				patternCode = 9;
-				exePattern(9);
+				exePattern(9, PATTERN_EXE_MODE_AUTO);
 				break;
 			case 5: // shake the toy left and right but doesn't go anywhere
 				patternCode = 6;
-				exePattern(6);
+				exePattern(6, PATTERN_EXE_MODE_AUTO);
 				break;
 			case 6: // rotate, go to somewhere else, then rotate again
 				patternCode = 1;
-				exePattern(1);
+				exePattern(1, PATTERN_EXE_MODE_AUTO);
 				break;
 			case 7: // wait until something reaches in front of IR sensor, then flee backwards
 				patternCode = 5;
-				exePattern(5);
+				exePattern(5, PATTERN_EXE_MODE_AUTO);
 				break;
 			case 8: // shake the toy left and right, flee to somewhere else, then shake the toy again
 				patternCode = 3;
-				exePattern(3);
+				exePattern(3, PATTERN_EXE_MODE_AUTO);
 				break;
 			case 9: // stand still, move toy up and down like the robot is fishing
 				patternCode = 8;
-				exePattern(8);
+				exePattern(8, PATTERN_EXE_MODE_AUTO);
 				break;
 			case 0: // if first scheduled pattern is auto decide, do code 5(shake)
 				patternCode = 5;
-				exePattern(5);
+				exePattern(5, PATTERN_EXE_MODE_AUTO);
 				break;
 			}
 		}
 		else {
-			exePattern(patternCode);
+			exePattern(patternCode, PATTERN_EXE_MODE_AUTO);
 		}
 
 	}
 
 	// retract toy and disable servo
-	sg90_disable(SG90_MOTOR_A);
+	//sg90_disable(SG90_MOTOR_A);
 	sg90_disable(SG90_MOTOR_B);
 
 	// move away from cat(park near a wall)
@@ -505,23 +521,27 @@ static void autoDrive() {
 
 static void coreMain() {
 	int32_t i32 = 0;
-	uint8_t* pu8 = 0;
+	HAL_UART_Transmit(pDbgUartHandle, (uint8_t*)"\r\nCORE: JUMPED TO MAIN PROGRAM\r\n", 33, 0xFFFF);
 	// check for rpi data
 	while (1) {
 		if (rpi_serialDtaAvailable()) { // process data if available
-			if (rpi_getSerialDta(rpidta)) { // get data
+			if (rpi_getSerialDta(&rpidta)) { // get data
+
+#ifdef _TEST_CONNECTION_ENABLED
+				uint8_t buf[9] = { 0, };
+				buf[0] = rpidta.type;
+				for (int i = 0; i < 7; i++) {
+					buf[i + 1] = rpidta.container[i];
+				}
+				buf[8] = 0;
+				HAL_UART_Transmit(pDbgUartHandle, buf, 9, 20);
+				HAL_UART_Transmit(pDbgUartHandle, (uint8_t*)"\r\n", 3, 20);
+#endif
+
 				switch (rpidta.type) {
-				case TYPE_NO:
-					break;
-				case TYPE_CONN:
-					break;
 				case TYPE_SCHEDULE_TIME:
 					if (!recvScheduleMode) break;
-					i32 = 0;
-					pu8 = &i32;
-					for (int i = 0; i < 4; i++) {
-						*(pu8++) = rpidta.container[i];
-					}
+					i32 = atoi32(rpidta.container);
 					if (scheduler_setTime(i32) == ERR) {
 						// error
 					}
@@ -529,13 +549,11 @@ static void coreMain() {
 				case TYPE_SCHEDULE_PATTERN:
 					if (!recvScheduleMode) break;
 					for (int i = 0; i < 7; i++) {
-						if (rpidta.container[i] & 0x0F) scheduler_enqueuePattern(rpidta.container[i] & 0x0F);
-						else break;
-						if (rpidta.container[i] & 0xF0) scheduler_enqueuePattern(rpidta.container[i] & 0xF0);
+						if (rpidta.container[i]) scheduler_enqueuePattern(rpidta.container[i]);
 						else break;
 					}
 					break;
-				case TYPE_SCHEDULE_SNACK:
+				case TYPE_SCHEDULE_SNACK_INTERVAL:
 					if (!recvScheduleMode) break;
 					scheduler_setSnack(rpidta.container[0]);
 					break;
@@ -545,10 +563,10 @@ static void coreMain() {
 					break;
 				case TYPE_SYS:
 					switch (rpidta.container[0]) {
-					case 0x01: // start manual drive
+					case '1': // start manual drive
 						manualDrive();
 						break;
-					case 0xFF: // initialize whole system
+					case '9': // initialize whole system
 						// not yet implemented
 						//core_restart();
 						break;
@@ -556,11 +574,7 @@ static void coreMain() {
 					break;
 				case TYPE_SCHEDULE_DURATION:
 					if (!recvScheduleMode) break;
-					i32 = 0;
-					pu8 = &i32;
-					for (int i = 0; i < 4; i++) {
-						*(pu8++) = rpidta.container[i];
-					}
+					i32 = atoi32(rpidta.container);
 					if (scheduler_setDuration(i32) == ERR) {
 						// error
 					}
@@ -589,12 +603,15 @@ static void coreMain() {
 }
 
 void core_setHandle(TIM_HandleTypeDef* ph) {
+	pTimHandle = ph;
+}
 
+void core_setHandleDebugUART(UART_HandleTypeDef* ph) {
+	pDbgUartHandle = ph;
 }
 
 void core_start() {
 	if (initState) coreMain(); // skip initialization
-
 	// initialization
 	periph_init();
 	opman_init();
@@ -623,6 +640,15 @@ void core_callOp(uint8_t opcode) {
 	}
 }
 
+/*
+void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
+	if (huart->Instance == USART1) {
+		rpi_RxCpltCallbackHandler();
+		//flagRxCplt = TRUE;
+	}
+}
+*/
+
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
 	if (huart->Instance == USART1) {
 		rpi_RxCpltCallbackHandler();
@@ -640,6 +666,8 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim){
 	}
 }
 
+/*
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
 
 }
+*/
