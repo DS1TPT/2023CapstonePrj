@@ -26,7 +26,6 @@
 
 // edit here if system configuration is changed
 #define SG90_TIM TIM1 // CAUTION: PSC, ARR, CCR use 16b val, but stm32cubeide's typedef is 32b.
-#define SG90_TIM_HANDLE &htim1
 #define SG90_MOTOR_CNT 2
 #define SG90_PWM_PORT GPIOA // A8, A9
 #define SG90_PWM_A GPIO_PIN_8 // CH1
@@ -43,10 +42,11 @@ struct SG90Stats {
 /* exported vars */
 
 /* exported func prototypes */
+void sg90_setHandle(TIM_HandleTypeDef* ph);
 void sg90_init();
 void sg90_enable(uint8_t motorNum, uint8_t angle); // start giving PWM signal
 void sg90_disable(uint8_t motorNum); // disable motor by stop giving PWM signal
 void sg90_setAngle(uint8_t motorNum, uint8_t angle); // set angle
-struct SG90Stats sg90_getStat(motor); // get status struct data
+struct SG90Stats sg90_getStat(uint8_t motor); // get status struct data
 
 #endif
