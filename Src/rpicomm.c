@@ -12,34 +12,6 @@
   *********************************************************************************************
   */
 
-/*
- * dta type header 8b.
- * dta container 7B
- * container dta info below:
- * NO: any data in container will be ignored.
- * CONN:DIS\0\0\0\0: this will turn on sleep or stand-by mode.
- * 		if no schedule is set, stand-by mode will be active.
- * 		if schedule is set, sleep mode will be active.
- * 		this behavior is for keeping pattern stack active.
- * 		CON\0\0\0\0: this will set RUN mode.
- * SCHEDULE_SPEED: DWORD 00 00 00. Use SIGNED int32.
- * SCHEDULE_PATTERN: pattern code, 4b per pattern.
- * 					therefore, a packet can contain up to 14 patterns.
- * 					NOTE: pattern stack can contain up to 70 patterns.
- * 						  this type of data can be sent 5 times in a row.
- * SCHEDULE_SNACK: number of times the owner want to give treat.
- * 				  format: BYTE 00 00 00 00 00 00 uint8
- * SCHEDULE_MODE: level of speed and aggressiveness: diffident - light - normal - active - energetic
- * 				  format: BYTE 00 00 00 00 00 00. uint8
- * 				  SYS: system commands. not defined this time
- * MANUAL_CTRL: format: BYTE 00 00 00 00 00 00. uint8
- * SCHEDULE_START: FF 00 FF 00 FF 00 FF
- * SCHEDULE_END: 00 FF 00 FF 00 FF 00
- * RESP: BYTE 00 00 00 00 00 00
- *
- * for more info, go to <https://github.com/DS1TPT/catCareBot> and check document pktDefs.pdf
- */
-
 #include "main.h"
 #include "rpicomm.h"
 #include "opman.h"
@@ -47,16 +19,16 @@
 static UART_HandleTypeDef* pUartHandle = NULL;
 
 static struct SerialDta UARTdta;
-static uint8_t rxBuf[9] = { 0, };
+static uint8_t rxBuf[DTA_LEN + 1] = { 0, };
 //static uint8_t txBuf[8] = { 0, };
 
 void rpi_setHandle(UART_HandleTypeDef* ph) {
 	pUartHandle = ph;
 }
 
-int rpi_getSerialDta(struct SerialDta dest) {
+int rpi_getSerialDta(struct SerialDta* pDest) {
 	if (UARTdta.available) { // has new received data
-		dest = UARTdta; // copy from internal var to dest var
+		*pDest = UARTdta; // copy from internal var to dest var
 		UARTdta.available = 0; // mark unavailable
 		return 1;
 	}
@@ -77,13 +49,15 @@ void rpi_init() {
 	for (int i = 0; i < 9; i++)
 		rxBuf[i] = 0;
 	//pinDta = 0;
-	HAL_UART_Receive_IT(pUartHandle, rxBuf, 9);
+	HAL_UART_Receive_IT(pUartHandle, rxBuf, DTA_LEN);
 }
 
 int rpi_serialDtaAvailable() { // returns zero if not available
 	if (UARTdta.available) return 1;
 	else return 0;
 }
+
+/*
 int rpi_tcpipRespond(uint8_t isErr) { // send RESP pkt to client app. returns OK on success
 	uint8_t buf[8] = { 0, };
 	buf[0] = 0xFF;
@@ -92,15 +66,17 @@ int rpi_tcpipRespond(uint8_t isErr) { // send RESP pkt to client app. returns OK
 	if (txRes == HAL_OK) return OK;
 	else return ERR;
 }
+*/
 
 void rpi_RxCpltCallbackHandler() {
 	UARTdta.available = 1; // mark available
 	UARTdta.type = rxBuf[0]; // copy data from buffer to internal var
-	for (int i = 0; i < 8; i++)
+	for (int i = 0; i < DTA_LEN - 1; i++)
 		UARTdta.container[i] = rxBuf[i + 1];
-	for (int i = 0; i < 9; i++) // clr buf
+	UARTdta.container[7] = 0;
+	for (int i = 0; i < DTA_LEN + 1; i++) // clr buf
 		rxBuf[i] = 0;
-	HAL_UART_Receive_IT(pUartHandle, rxBuf, 9); // restart rx
+	HAL_UART_Receive_IT(pUartHandle, rxBuf, DTA_LEN); // restart rx
 }
 
 void rpi_sendPin(int code) {
