@@ -63,7 +63,11 @@ int scheduler_enqueuePattern(uint8_t code) {
 	if (QP.count == 70) return ERR;
 	for (int i = 0; i < QP.count - 1; i++) {
 		QP.queue[i + 1] = QP.queue[i];
+#ifndef _ASCII_NUMBER_FOR_PATTERN_CODE
 		QP.queue[i] = code;
+#else
+		QP.queue[i] = code - 0x30;
+#endif
 		QP.count++;
 	}
 	return OK;
