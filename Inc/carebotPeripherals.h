@@ -1,7 +1,7 @@
 /**
   *********************************************************************************************
   * NAME OF THE FILE : carebotPeripherals.h
-  * BRIEF INFORMATION: peripheral device driver
+  * BRIEF INFORMATION: drives peripheral device
   *
   * Copyright (c) 2023 Lee Geon-goo.
   * All rights reserved.
