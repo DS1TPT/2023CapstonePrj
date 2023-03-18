@@ -1,7 +1,7 @@
 /**
   *********************************************************************************************
   * NAME OF THE FILE : scheduler.c
-  * BRIEF INFORMATION: auto-play schedule related functions
+  * BRIEF INFORMATION: auto-play schedule
   *
   * Copyright (c) 2023 Lee Geon-goo.
   * All rights reserved.
