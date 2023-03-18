@@ -14,6 +14,8 @@
 #ifndef SCHEDULER_H
 #define SCHEDULER_H
 
+#define _ASCII_NUMBER_FOR_PATTERN_CODE
+
 /* includes */
 #include "main.h"
 //#include "rpicomm.h"
