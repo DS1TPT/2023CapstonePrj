@@ -16,14 +16,13 @@ CH1: 장난감 모터. CH2: 간식용 모터.
 듀티비는 알아봐야 할 듯 → ioc에서는 0으로 해놓음
 10번: 내부 타이머, 경과시간 카운트용(s). 84M psc 8400 cntr 10000 = 1 
 11번: 내부 타이머, 딜레이 카운트용(us). 84M psc 1 cntr 84 = 1,000,000(1M, 1us)
+→ 그냥 밀리초 타이머 쓰기로 함... 나중에 ioc 파일 고쳐서 밀리초 타이머로 바꿀 것
 
 ADC1 IN8: 적외선 거리 센서
 ADC1 IN9: 움직임 센서
 
 USART1: 라즈베리파이와의 통신(9600bps, Async, 8b, no parity, stop 1)
 
-PA0: 라즈베리파이 GPIO, 고양이 인식됨
-PA1: 라즈베리파이 GPIO, 예비
 PA6: L298N, 모터A, TIM3 PWM CH1
 PA7: L298N, 모터B, TIM3 PWM CH2
 PC0, PC1: L298N, 모터A IN. GPIO-O
