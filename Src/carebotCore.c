@@ -25,14 +25,14 @@ struct SerialDta rpidta;
 #define PATTERN_EXE_MODE_MAN 1
 
 // for testing this to test connection(received uart data will be sent to debug uart port)
-#define _TEST_CONNECTION_ENABLED
+#define _TEST_MODE_ENABLED
 
 // system properties (editable)
-const uint8_t MAN_ROT_SPD = 44; // RANGE: 6~114, EVEN NUMBER. AFFECTS AUTO SPEED
-const uint8_t MAN_DRV_SPD = 88; // RANGE: 6~114, EVEN NUMBER. AFFECTS AUTO SPEED
+const uint8_t MAN_ROT_SPD = 60; // RANGE: 6~114, EVEN NUMBER. AFFECTS AUTO SPEED
+const uint8_t MAN_DRV_SPD = 100; // RANGE: 6~114, EVEN NUMBER. AFFECTS AUTO SPEED
 const uint8_t SPD_ADDEND = 40; // THIS NUMBER MUST NOT EXCEED: 254 - MANUAL SPEED * 2
 const uint8_t SPD_SUBTRAHEND = 10; // THIS NUMBER MUST BE LESS THAN: MANUAL SPEED / 4
-const uint8_t DEF_ANG_A = 45; // default angle of toy motor, WRITE RETRACTED ANGLE
+//const uint8_t DEF_ANG_A = 45; // default angle of toy motor, WRITE RETRACTED ANGLE
 const uint8_t DEF_ANG_B = 30; // default angle of snack motor
 const uint16_t OP_SNACK_RET_MOTOR_WAITING_TIME = 500;
 const int32_t PATTERN_WAIT_AND_FLEE_WAIT_TIME = 20; // RANGE: 1 ~ 60, in seconds
@@ -43,9 +43,9 @@ const uint8_t AUTO_DEF_DRV_SPD = MAN_DRV_SPD / 2;
 const uint8_t AUTO_MIN_ROT_SPD = (uint8_t)((float)AUTO_DEF_ROT_SPD / 2.0) - (((float)AUTO_DEF_ROT_SPD / 2.0 > 0) ? 0 : 1);
 const uint8_t AUTO_MIN_DRV_SPD = (uint8_t)((float)AUTO_DEF_DRV_SPD / 2.0) - (((float)AUTO_DEF_ROT_SPD / 2.0 > 0) ? 0 : 1);
 const uint8_t SPD_OVERSHOOT_ADDEND = ((AUTO_DEF_ROT_SPD > AUTO_DEF_DRV_SPD) ? (254 - AUTO_DEF_DRV_SPD * 4) : (254 - AUTO_DEF_ROT_SPD * 4));
-const uint8_t TOY_ANG_DRAW = DEF_ANG_A + 90; // max angle(draw) of toy motor
-const uint8_t TOY_ANG_HALF = DEF_ANG_A + 45; // half draw angle
-const uint8_t TOY_ANG_RETRACT = DEF_ANG_A;
+//const uint8_t TOY_ANG_DRAW = DEF_ANG_A + 90; // max angle(draw) of toy motor
+//const uint8_t TOY_ANG_HALF = DEF_ANG_A + 45; // half draw angle
+//const uint8_t TOY_ANG_RETRACT = DEF_ANG_A;
 const uint8_t SNACK_ANG_RDY = DEF_ANG_B;
 const uint8_t SNACK_ANG_GIVE = DEF_ANG_B + 90;
 
@@ -82,6 +82,9 @@ int32_t atoi32(uint8_t* str) {
 
 
 static void exePattern(int code, int mode) {
+#ifdef _TEST_MODE_ENABLED
+	HAL_UART_Transmit(pDbgUartHandle, (uint8_t*)"BEGIN PATTERN", 14, 20);
+#endif
 	uint8_t spdMultiplier = 0;
 	uint8_t rotSpd, drvSpd;
 	int32_t interval = 0; // seconds
@@ -139,7 +142,7 @@ static void exePattern(int code, int mode) {
 		}
 		break;
 	case 2: // loop of Sudden accel., decel.
-		rptNum = interval / 12;
+		rptNum = interval / 20;
 		if (rptNum < 2) rptNum = 1; // execute at least one time
 		for (int32_t i32 = 0; i32 < rptNum; i32++) {
 			// forward
@@ -148,10 +151,10 @@ static void exePattern(int code, int mode) {
 			for (int i = 0; i < 4; i++) {
 				l298n_setSpeed(L298N_MOTOR_A, drvSpd + SPD_OVERSHOOT_ADDEND);
 				l298n_setSpeed(L298N_MOTOR_B, drvSpd + SPD_OVERSHOOT_ADDEND);
-				HAL_Delay(200);
+				HAL_Delay(800);
 				l298n_setSpeed(L298N_MOTOR_A, drvSpd);
 				l298n_setSpeed(L298N_MOTOR_B, drvSpd);
-				HAL_Delay(300);
+				HAL_Delay(700);
 				l298n_setSpeed(L298N_MOTOR_A, 0);
 				l298n_setSpeed(L298N_MOTOR_B, 0);
 				HAL_Delay(1000);
@@ -162,10 +165,10 @@ static void exePattern(int code, int mode) {
 			for (int i = 0; i < 4; i++) {
 				l298n_setSpeed(L298N_MOTOR_A, drvSpd + SPD_OVERSHOOT_ADDEND);
 				l298n_setSpeed(L298N_MOTOR_B, drvSpd + SPD_OVERSHOOT_ADDEND);
-				HAL_Delay(200);
+				HAL_Delay(800);
 				l298n_setSpeed(L298N_MOTOR_A, drvSpd);
 				l298n_setSpeed(L298N_MOTOR_B, drvSpd);
-				HAL_Delay(300);
+				HAL_Delay(700);
 				l298n_setSpeed(L298N_MOTOR_A, 0);
 				l298n_setSpeed(L298N_MOTOR_B, 0);
 				HAL_Delay(1000);
@@ -279,10 +282,10 @@ static void exePattern(int code, int mode) {
 				l298n_setRotation(L298N_MOTOR_B, L298N_CCW);
 				l298n_setSpeed(L298N_MOTOR_A, drvSpd + SPD_OVERSHOOT_ADDEND);
 				l298n_setSpeed(L298N_MOTOR_B, drvSpd + SPD_OVERSHOOT_ADDEND);
-				HAL_Delay(200);
+				HAL_Delay(500);
 				l298n_setSpeed(L298N_MOTOR_A, drvSpd);
 				l298n_setSpeed(L298N_MOTOR_B, drvSpd);
-				HAL_Delay(400);
+				HAL_Delay(1000);
 				l298n_setSpeed(L298N_MOTOR_A, 0);
 				l298n_setSpeed(L298N_MOTOR_B, 0);
 				break;
@@ -366,16 +369,32 @@ static void exePattern(int code, int mode) {
 	}
 	l298n_setRotation(L298N_MOTOR_A, L298N_STOP); // stop motor rotation after each pattern exe
 	l298n_setRotation(L298N_MOTOR_B, L298N_STOP);
+#ifdef _TEST_MODE_ENABLED
+	HAL_UART_Transmit(pDbgUartHandle, (uint8_t*)"END PATTERN", 12, 20);
+#endif
 }
 
 static void manualDrive() {
+#ifdef _TEST_MODE_ENABLED
+	HAL_UART_Transmit(pDbgUartHandle, (uint8_t*)"BEGIN MANUAL MODE", 18, 20);
+#endif
 	// enable motor first
 	l298n_enable();
-	sg90_enable(SG90_MOTOR_A, DEF_ANG_A);
+	//sg90_enable(SG90_MOTOR_A, DEF_ANG_A);
 	sg90_enable(SG90_MOTOR_B, DEF_ANG_B);
 	while (1) {
 		if (rpi_serialDtaAvailable()) {
 			if (rpi_getSerialDta(&rpidta)) {
+#ifdef _TEST_MODE_ENABLED
+				uint8_t buf[9] = { 0, };
+				buf[0] = rpidta.type;
+				for (int i = 0; i < 7; i++) {
+					buf[i + 1] = rpidta.container[i];
+				}
+				buf[8] = 0;
+				HAL_UART_Transmit(pDbgUartHandle, buf, 9, 20);
+				HAL_UART_Transmit(pDbgUartHandle, (uint8_t*)"\r\n", 3, 20);
+#endif
 				if (rpidta.type == TYPE_MANUAL_CTRL && rpidta.container[0] == '0') {
 					switch (rpidta.container[1]) {
 					case '0': // stop
@@ -410,14 +429,21 @@ static void manualDrive() {
 				}
 				else if (rpidta.type == TYPE_MANUAL_CTRL && rpidta.container[0] != '0') {
 					if (rpidta.container[0] == 'P') {
-
+#ifdef _TEST_MODE_ENABLED
+						HAL_UART_Transmit(pDbgUartHandle, (uint8_t*)"RECEIVED PATTERN CODE!", 23, 20);
+#endif
+						exePattern((rpidta.container[1] - 0x30), PATTERN_EXE_MODE_MAN);
 					}
 				}
 				else if (rpidta.type == TYPE_SYS && rpidta.container[0] == 2) {
 					// stop manual drive
 					l298n_disable();
-					sg90_disable(SG90_MOTOR_A);
+					//sg90_disable(SG90_MOTOR_A);
 					sg90_disable(SG90_MOTOR_B);
+#ifdef _TEST_MODE_ENABLED
+					HAL_UART_Transmit(pDbgUartHandle, (uint8_t*)"END MANUAL MODE", 16, 20);
+#endif
+					return;
 				}
 			}
 		}
@@ -527,7 +553,7 @@ static void coreMain() {
 		if (rpi_serialDtaAvailable()) { // process data if available
 			if (rpi_getSerialDta(&rpidta)) { // get data
 
-#ifdef _TEST_CONNECTION_ENABLED
+#ifdef _TEST_MODE_ENABLED
 				uint8_t buf[9] = { 0, };
 				buf[0] = rpidta.type;
 				for (int i = 0; i < 7; i++) {
@@ -562,6 +588,9 @@ static void coreMain() {
 					scheduler_setSpd(rpidta.container[0]);
 					break;
 				case TYPE_SYS:
+#ifdef _TEST_MODE_ENABLED
+					HAL_UART_Transmit(pDbgUartHandle, (uint8_t*)"SYS CMD", 8, 20);
+#endif
 					switch (rpidta.container[0]) {
 					case '1': // start manual drive
 						manualDrive();
@@ -585,7 +614,6 @@ static void coreMain() {
 				case TYPE_SCHEDULE_END:
 					recvScheduleMode = FALSE;
 				}
-
 			}
 		}
 		else { // do something else
