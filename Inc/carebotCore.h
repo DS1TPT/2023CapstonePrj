@@ -56,9 +56,11 @@ int core_dtaStruct_pushU8(dtaStructStackU8 *structStack, uint8_t data);
 int core_dtaStruct_popU8(dtaStructStackU8 *structStack, uint8_t *pDest);
 
 // delayed operation support
-void core_addPendingOp(uint8_t opcode, uint16_t milliseconds); // opcode 0 will be ignored
-void core_canclePendingOp(uint8_t opcode);
+int core_call_pendingOpAdd(uint8_t opcode, uint16_t milliseconds); // opcode 0 will be ignored. returns ERR on error, OK on success
+int core_call_pendingOpTimeReset(uint8_t opcode, uint16_t milliseconds); // re-configure waiting time of an already-postponed operation
+int core_call_pendingOpExeImmediate(uint8_t opcode) // immediately execute postponed operation and remove from pending list
+void core_call_pendingOpCancel(uint8_t opcode);
 
-void core_callbackHandler();
+//void core_callbackHandler();
 
 #endif
