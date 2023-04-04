@@ -25,7 +25,7 @@ static uint8_t initState = FALSE;
 static uint8_t secTimEna = FALSE;
 
 static uint8_t opcodeMem = 0;
-static uint16_t timeMem[8] = { 0, };
+static volatile uint16_t timeMem[8] = { 0, };
 static uint8_t timEna = FALSE;
 
 static TIM_HandleTypeDef* pSecTimHandle = NULL;
@@ -111,23 +111,50 @@ int core_dtaStruct_popU8(dtaStructStackU8 *structStack, uint8_t *pDest) {
 	return OK;
 }
 
+
 /* delayed operation support functions */
 
-void core_addPendingOp(uint8_t opcode, uint16_t milliseconds) {
-	if (!opcode) return;
+int core_call_pendingOpAdd(uint8_t opcode, uint16_t milliseconds) {
+	if (!opcode) return ERR;
 	// add pending operation, which will be executed after n milliseconds
 	if (timEna == FALSE) { // enable timer if timer is off
 		HAL_TIM_Base_Start_IT(pMillisecTimHandle);
 		timEna = TRUE;
 	}
-	if (opcodeMem & opcode) return; // already have same operation postponed
+	if (opcodeMem & opcode) return ERR; // already have same operation postponed
 	else {
 		opcodeMem = opcodeMem & opcode;
 		timeMem[getBitPos(opcode)] = milliseconds;
 	}
+    return OK;
 }
 
-void core_canclePendingOp(uint8_t opcode) {
+int core_call_pendingOpTimeReset(uint8_t opcode, uint16_t milliseconds) {
+    if (!opcode) return ERR;
+    // check if opcode is not set
+    if (timEna == FALSE) return ERR;
+    if (!(opcodeMem & opcode)) return ERR; // commanded opcode is not set
+    else if (timeMem[getBitPos(&opcode) <= 0]) return ERR; // commanded time had been elapsed already
+    
+    // reset time
+    timeMem[getBitPos(opcode)] = milliseconds;
+    return OK;
+    
+}
+
+int core_call_pendingOpExeImmediate(uint8_t opcode) {
+    if (!opcode) return ERR;
+    if (timEna == FALSE) return ERR;
+    if (!(opcodeMem & opcode)) return ERR;
+    else if (timeMem[getBitPos(opcode) <= 0]) return ERR;
+    
+    timeMem[getBitPos(opcode)] = 0;
+    opcodeMem = opcodeMem & ~opcode;
+    app_opTimeout(opcode);
+    return OK;
+}
+
+void core_call_pendingOpCancel(uint8_t opcode) {
 	if (!opcode) return;
 	timeMem[getBitPos(opcode)] = 0;
 	opcodeMem = opcodeMem & ~opcode;
