@@ -14,7 +14,20 @@
 #ifndef CAREBOTCORE_H
 #define CAREBOTCORE_H
 
+/*
+ * delayed operation handler functions, and second timer interrupt handler functions MUST be declared in following type:
+ * core_statRetTypeDef functionName()
+ * When test mode is enabled, the core will halt firmware execution if a handler function returns non-OK value.
+ * Max number of handler functions for delayed opration and second timer interrupt is 8.
+ */
+
 #include "main.h"
+/*
+ * main.h MUST contains the following definitions:
+ * #define FALSE 0
+ * #define TRUE 1
+ *
+ */
 
 // for testing this to test connection(received uart data will be sent to debug uart port)
 #define _TEST_MODE_ENABLED
@@ -22,6 +35,11 @@
 /* definitions */
 #define DTA_STRUCT_QUEUE_SIZE 128
 #define DTA_STRUCT_STACK_SIZE 128
+
+typedef enum {
+	OK = 0x00U,
+	ERR = 0xFFU
+} core_statRetTypeDef;
 
 /* structures */
 struct dtaStructQueueU8 {
@@ -44,22 +62,31 @@ void core_start(); // this should be called only once by main.c
 
 // application support functions
 // data structures support
-_Bool core_dtaStruct_queueU8isEmpty(dtaStructQueueU8 *structQueue);
-_Bool core_dtaStruct_queueU8isFull(dtaStructQueueU8 *structQueue);
-void core_dtaStruct_queueU8init(dtaStructQueueU8 *structQueue);
-int core_dtaStruct_enqueueU8(dtaStructQueueU8 *structQueue, uint8_t data);
-int core_dtaStruct_dequeueU8(dtaStructQueueU8 *structQueue, uint8_t *pDest);
-_Bool core_dtaStruct_stackU8isEmpty(dtaStructStackU8 *structStack);
-_Bool core_dtaStruct_stackU8isEmpty(dtaStructStackU8 *structStack);
-void core_dtaStruct_stackU8init(dtaStructStackU8 *structStack);
-int core_dtaStruct_pushU8(dtaStructStackU8 *structStack, uint8_t data);
-int core_dtaStruct_popU8(dtaStructStackU8 *structStack, uint8_t *pDest);
+_Bool core_dtaStruct_queueU8isEmpty(struct dtaStructQueueU8 *structQueue);
+_Bool core_dtaStruct_queueU8isFull(struct dtaStructQueueU8 *structQueue);
+void core_dtaStruct_queueU8init(struct dtaStructQueueU8 *structQueue);
+core_statRetTypeDef core_dtaStruct_enqueueU8(struct dtaStructQueueU8 *structQueue, uint8_t data);
+core_statRetTypeDef core_dtaStruct_dequeueU8(struct dtaStructQueueU8 *structQueue, uint8_t *pDest);
+_Bool core_dtaStruct_stackU8isEmpty(struct dtaStructStackU8 *structStack);
+_Bool core_dtaStruct_stackU8isEmpty(struct dtaStructStackU8 *structStack);
+void core_dtaStruct_stackU8init(struct dtaStructStackU8 *structStack);
+core_statRetTypeDef core_dtaStruct_pushU8(struct dtaStructStackU8 *structStack, uint8_t data);
+core_statRetTypeDef core_dtaStruct_popU8(struct dtaStructStackU8 *structStack, uint8_t *pDest);
 
 // delayed operation support
-int core_call_pendingOpAdd(uint8_t opcode, uint16_t milliseconds); // opcode 0 will be ignored. returns ERR on error, OK on success
-int core_call_pendingOpTimeReset(uint8_t opcode, uint16_t milliseconds); // re-configure waiting time of an already-postponed operation
-int core_call_pendingOpExeImmediate(uint8_t opcode) // immediately execute postponed operation and remove from pending list
+core_statRetTypeDef core_call_pendingOpRegister(uint8_t *opcodeDest, core_statRetTypeDef(*pHandlerFunc)());
+core_statRetTypeDef core_call_pendingOpUnregister(uint8_t opcode);
+core_statRetTypeDef core_call_pendingOpAdd(uint8_t opcode, uint16_t milliseconds); // opcode 0 will be ignored. returns ERR on error, OK on success
+core_statRetTypeDef core_call_pendingOpTimeReset(uint8_t opcode, uint16_t milliseconds); // re-configure waiting time of an already-postponed operation
+core_statRetTypeDef core_call_pendingOpExeImmediate(uint8_t opcode); // immediately execute postponed operation and remove from pending list
 void core_call_pendingOpCancel(uint8_t opcode);
+
+// time support
+core_statRetTypeDef core_call_secTimIntrRegister(core_statRetTypeDef(*pHandlerFunc)());
+core_statRetTypeDef core_call_secTimIntrUnregister(core_statRetTypeDef(*pHandlerFunc)());
+
+// misc support
+core_statRetTypeDef core_dbgTx(char *sz);
 
 //void core_callbackHandler();
 
