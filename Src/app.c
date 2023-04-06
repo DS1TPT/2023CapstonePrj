@@ -53,19 +53,16 @@ static uint8_t flagTimeElapsed = FALSE;
 static uint8_t flagAutorun = FALSE;
 static uint8_t recvScheduleMode = FALSE;
 static uint8_t initState = FALSE;
-static uint8_t secTimEna = FALSE;
-
-static UART_HandleTypeDef* pDbgUartHandle = NULL;
 
 static struct dtaStructQueueU8 patternQueue;
-static struct Time T;
 static uint8_t speed = 0; // 0 ~ 4.
-
 static int32_t skdWaitTime = 0;
 static int32_t skdDuration = 0;
 static int skdSpd = 0;
 static int skdSnackIntv = 0;
 static _Bool skdIsSet = FALSE;
+
+static uint8_t opcodePendingOp = 0;
 
 /* basic functions */
 int32_t atoi32(uint8_t* str) {
@@ -93,7 +90,7 @@ int32_t atoi32(uint8_t* str) {
 /* play related functions */
 static void exePattern(int code, int mode) {
 #ifdef _TEST_MODE_ENABLED
-	HAL_UART_Transmit(pDbgUartHandle, (uint8_t*)"BEGIN PATTERN ", 15, 20);
+	core_dbgTx("BEGIN PATTERN ");
 #endif
 	uint8_t spdMultiplier = 0;
 	uint8_t rotSpd, drvSpd;
@@ -103,7 +100,7 @@ static void exePattern(int code, int mode) {
 	int32_t cnt = 0;
 	if (mode == PATTERN_EXE_MODE_AUTO) {
 		spdMultiplier = skdSpd;
-		interval = scheduleDuration / patternQueue.count;
+		interval = skdDuration / patternQueue.index;
 
 		if (!flagAutorun) interval = 1;
 
@@ -380,13 +377,13 @@ static void exePattern(int code, int mode) {
 	l298n_setRotation(L298N_MOTOR_A, L298N_STOP); // stop motor rotation after each pattern exe
 	l298n_setRotation(L298N_MOTOR_B, L298N_STOP);
 #ifdef _TEST_MODE_ENABLED
-	HAL_UART_Transmit(pDbgUartHandle, (uint8_t*)"END PATTERN\r\n", 14, 20);
+	core_dbgTx("END PATTERN\r\n");
 #endif
 }
 
 static void manualDrive() {
 #ifdef _TEST_MODE_ENABLED
-	HAL_UART_Transmit(pDbgUartHandle, (uint8_t*)"BEGIN MANUAL MODE\r\n", 20, 20);
+	core_dbgTx("BEGIN MANUAL MODE\r\n");
 #endif
 	// enable motor first
 	l298n_enable();
@@ -402,8 +399,8 @@ static void manualDrive() {
 					buf[i + 1] = rpidta.container[i];
 				}
 				buf[8] = 0;
-				HAL_UART_Transmit(pDbgUartHandle, buf, 9, 20);
-				HAL_UART_Transmit(pDbgUartHandle, (uint8_t*)"\r\n", 3, 20);
+				core_dbgTx((char*)buf);
+				core_dbgTx("\r\n");
 #endif
 				if (rpidta.type == TYPE_MANUAL_CTRL && rpidta.container[0] == '0') {
 					switch (rpidta.container[1]) {
@@ -440,7 +437,7 @@ static void manualDrive() {
 				else if (rpidta.type == TYPE_MANUAL_CTRL && rpidta.container[0] != '0') {
 					if (rpidta.container[0] == 'P') {
 #ifdef _TEST_MODE_ENABLED
-						HAL_UART_Transmit(pDbgUartHandle, (uint8_t*)"RECEIVED PATTERN CODE!\r\n", 25, 20);
+						core_dbgTx("RECEIVED PATTERN CODE!\r\n");
 #endif
 						exePattern((rpidta.container[1] - 0x30), PATTERN_EXE_MODE_MAN);
 					}
@@ -451,7 +448,7 @@ static void manualDrive() {
 					//sg90_disable(SG90_MOTOR_A);
 					sg90_disable(SG90_MOTOR_B);
 #ifdef _TEST_MODE_ENABLED
-					HAL_UART_Transmit(pDbgUartHandle, (uint8_t*)"END MANUAL MODE\r\n", 18, 20);
+					core_dbgTx("END MANUAL MODE\r\n");
 #endif
 					return;
 				}
@@ -462,7 +459,7 @@ static void manualDrive() {
 
 static void autoDrive() {
 	//uint8_t rpiPinDta = 0;
-	int patternCode = 0, patternCodePrev = 0;
+	uint8_t patternCode = 0, patternCodePrev = 0;
 
 	// enable motor
 	l298n_enable();
@@ -491,7 +488,8 @@ static void autoDrive() {
 	while (1) {
 		// get pattern code and move robot according to dequeued code
 		patternCodePrev = patternCode;
-		core_dtaStruct_dequeueU8(&patternQueue, &patternCode);
+		if (core_dtaStruct_queueU8isEmpty(&patternQueue)) break;
+		if (core_dtaStruct_dequeueU8(&patternQueue, &patternCode) == ERR) break; // empty
 		if (!patternCode) { // Auto-decide
 			/*
 			 * if active pattern was executed previously, do more static ones
@@ -564,8 +562,10 @@ static void autoDrive() {
 /* main */
 
 static void appMain() {
-	int32_t i32 = 0;
-	HAL_UART_Transmit(pDbgUartHandle, (uint8_t*)"\r\nAPPLICATION START\r\n", 22, 0xFFFF);
+	//int32_t i32 = 0;
+#ifdef _TEST_MODE_ENABLED
+	core_dbgTx("\r\nAPPLICATION START\r\n");
+#endif
 	// check for rpi data
 	while (1) {
 		if (rpi_serialDtaAvailable()) { // process data if available
@@ -578,8 +578,8 @@ static void appMain() {
 					buf[i + 1] = rpidta.container[i];
 				}
 				buf[8] = 0;
-				HAL_UART_Transmit(pDbgUartHandle, buf, 9, 20);
-				HAL_UART_Transmit(pDbgUartHandle, (uint8_t*)"\r\n", 3, 20);
+				core_dbgTx((char*)buf);
+				core_dbgTx("\r\n");
 #endif
 
 				switch (rpidta.type) {
@@ -604,7 +604,7 @@ static void appMain() {
 					break;
 				case TYPE_SYS:
 #ifdef _TEST_MODE_ENABLED
-					HAL_UART_Transmit(pDbgUartHandle, (uint8_t*)"SYS CMD: ", 10, 20);
+					core_dbgTx("SYS CMD: ");
 #endif
 					switch (rpidta.container[0]) {
 					case '1': // start manual drive
@@ -642,30 +642,52 @@ static void appMain() {
 	}
 }
 
-void app_opTimeout() {
-	switch (opcode) {
-	case OP_SNACK_RET_MOTOR:
-		sg90_setAngle(SG90_MOTOR_B, SNACK_ANG_RDY);
-		break;
-	case OP_RPI_PIN_IO_SEND_RESET:
-		rpi_opmanTimeoutHandler();
-		break;
-	}
+static core_statRetTypeDef app_pendingOpTimeoutHandler() {
+	sg90_setAngle(SG90_MOTOR_B, SNACK_ANG_RDY);
+	return OK;
+
 }
 
-void app_secTimCallbackHandler() {
-	if(scheduler_TimCallbackHandler()) flagTimeElapsed = TRUE;
+core_statRetTypeDef app_secTimCallbackHandler() {
+	if(--skdWaitTime <= 0) flagTimeElapsed = TRUE;
 	else flagTimeElapsed = FALSE;
+	return OK;
 }
 
-void app_start(UART_HandleTypeDef* pHandleDbgUART) {
+void app_start() {
+	if (initState == TRUE) {
+#ifdef _TEST_MODE_ENABLED
+		core_dbgTx("\r\n?DETECTED APP RESTART\r\n");
+		while (1) {
+
+		}
+#endif
+	}
+	uint8_t *pu8 = &opcodePendingOp;
+	core_statRetTypeDef(*phf)() = &app_pendingOpTimeoutHandler;
+#ifdef _TEST_MODE_ENABLED
+	if (core_call_pendingOpRegister(pu8, phf) != OK) {
+		core_dbgTx("\r\n?FAILED TO REGISTER PENDING OP HANDLER FUNCTION OF APP\r\n");
+		while (1) {
+
+		}
+	}
+	if (core_call_secTimIntrRegister(&app_secTimCallbackHandler) != OK) {
+		core_dbgTx("\r\n?FAILED TO REGISTER SECOND TIMER INTR HANDLER FUNCTION OF APP\r\n");
+		while (1) {
+
+		}
+	}
+#else
+	core_call_pendingOpRegister(pu8, phf);
+	core_call_secTimIntrRegister(&app_secTimCallbackHandler);
+#endif
 	core_dtaStruct_queueU8init(&patternQueue);
 	speed = 2; // initial value is normal
-	snackNum = 0;
 	skdSpd = 0;
 	skdDuration = 0;
 	skdSnackIntv = 0;
 	skdIsSet = FALSE;
-	pDbgUartHandle = pHandleDbgUART;
+	initState = TRUE;
 	appMain();
 }
