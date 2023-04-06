@@ -68,6 +68,6 @@ int rpi_serialDtaAvailable(); // returns zero if not available
 //int rpi_tcpipRespond(uint8_t isErr); // send RESP pkt to client app. returns 0 on success
 
 void rpi_RxCpltCallbackHandler();
-void rpi_opmanTimeoutHandler();
+void rpi_msTimeoutHandler();
 
 #endif
