@@ -13,14 +13,16 @@
   */
 
 #include "main.h"
+#include "carebotCore.h"
 #include "rpicomm.h"
-#include "opman.h"
 
 static UART_HandleTypeDef* pUartHandle = NULL;
 
 static struct SerialDta UARTdta;
 static uint8_t rxBuf[DTA_LEN + 1] = { 0, };
 //static uint8_t txBuf[8] = { 0, };
+
+static uint8_t opcode = 0;
 
 void rpi_setHandle(UART_HandleTypeDef* ph) {
 	pUartHandle = ph;
@@ -42,14 +44,6 @@ uint8_t rpi_getPinDta() {
 	else dta &= ~(RPI_PINCODE_I_FOUNDCAT);
 	// add more code as needed
 	return dta;
-}
-
-void rpi_init() {
-	UARTdta.available = 0;
-	for (int i = 0; i < 9; i++)
-		rxBuf[i] = 0;
-	//pinDta = 0;
-	HAL_UART_Receive_IT(pUartHandle, rxBuf, DTA_LEN);
 }
 
 int rpi_serialDtaAvailable() { // returns zero if not available
@@ -80,7 +74,7 @@ void rpi_RxCpltCallbackHandler() {
 }
 
 void rpi_sendPin(int code) {
-	opman_canclePendingOp(OP_RPI_PIN_IO_SEND_RESET);
+	core_call_pendingOpCancel(opcode);
 	switch (code) {
 	case RPI_PINCODE_O_SCHEDULE_EXE:
 		HAL_GPIO_WritePin(RPI_PIN_OUT_PORT, RPI_PIN_OUT_SCHEDULE_EXE, GPIO_PIN_SET);
@@ -92,13 +86,31 @@ void rpi_sendPin(int code) {
 		HAL_GPIO_WritePin(RPI_PIN_OUT_PORT, RPI_PIN_OUT_FIND_CAT_TIMEOUT, GPIO_PIN_SET);
 		break;
 	}
-	opman_addPendingOp(OP_RPI_PIN_IO_SEND_RESET, RPI_PIN_SEND_WAITING_TIME);
+	core_call_pendingOpAdd(opcode, RPI_PIN_SEND_WAITING_TIME);
 }
 
-void rpi_opmanTimeoutHandler() {
+core_statRetTypeDef rpi_pendingOpTimeoutHandler() {
 	HAL_GPIO_WritePin(RPI_PIN_OUT_PORT, RPI_PIN_OUT_SCHEDULE_EXE, GPIO_PIN_RESET);
 	HAL_GPIO_WritePin(RPI_PIN_OUT_PORT, RPI_PIN_OUT_SCHEDULE_END, GPIO_PIN_RESET);
 	HAL_GPIO_WritePin(RPI_PIN_OUT_PORT, RPI_PIN_OUT_FIND_CAT_TIMEOUT, GPIO_PIN_RESET);
+	return OK;
+}
+
+void rpi_init() {
+	core_statRetTypeDef retval = core_call_pendingOpRegister(&opcode, &rpi_pendingOpTimeoutHandler);
+	if (retval != OK) {
+#ifdef _TEST_MODE_ENABLED
+		core_dbgTx("\r\n?FAILED TO REGISTER RPI PENDING OP HANDLER FUNCTION OF RPICOMM\r\n");
+		while (1) {
+
+		}
+#endif
+	}
+	UARTdta.available = 0;
+	for (int i = 0; i < 9; i++)
+		rxBuf[i] = 0;
+	//pinDta = 0;
+	HAL_UART_Receive_IT(pUartHandle, rxBuf, DTA_LEN);
 }
 
 /* ADD THIS TO MAIN.C
