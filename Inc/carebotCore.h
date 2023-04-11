@@ -14,6 +14,8 @@
 #ifndef CAREBOTCORE_H
 #define CAREBOTCORE_H
 
+#include "main.h"
+
 /*
  * delayed operation handler functions, and second timer interrupt handler functions MUST be declared in following type:
  * core_statRetTypeDef functionName()
@@ -21,16 +23,19 @@
  * Max number of handler functions for delayed opration and second timer interrupt is 8.
  */
 
-#include "main.h"
-/*
- * main.h MUST contains the following definitions:
- * #define FALSE 0
- * #define TRUE 1
- *
- */
+#ifndef FALSE
+#define FALSE 0
+#endif
+#ifndef TRUE
+#define TRUE 1
+#endif
 
-// for testing this to test connection(received uart data will be sent to debug uart port)
+// for tesing. defining this will make robot to send program execution status via Serial.
 #define _TEST_MODE_ENABLED
+// un-comment this to use UART
+// #define _TEST_MODE_SEND_VIA_UART
+// un-comment this to use ST-LINK SWO
+#define _TEST_MODE_SEND_VIA_STLINK_SWO
 
 /* definitions */
 #define DTA_STRUCT_QUEUE_SIZE 128
