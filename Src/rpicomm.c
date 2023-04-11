@@ -12,7 +12,6 @@
   *********************************************************************************************
   */
 
-#include "main.h"
 #include "carebotCore.h"
 #include "rpicomm.h"
 
@@ -112,11 +111,3 @@ void rpi_init() {
 	//pinDta = 0;
 	HAL_UART_Receive_IT(pUartHandle, rxBuf, DTA_LEN);
 }
-
-/* ADD THIS TO MAIN.C
-void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
-	if (huart->Instance == USART1) {
-		rpi_RxCpltCallbackHandler();
-	}
-}
-*/
