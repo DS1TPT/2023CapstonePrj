@@ -1,7 +1,8 @@
 /**
   *********************************************************************************************
   * NAME OF THE FILE : l298n.c
-  * BRIEF INFORMATION: Drive L298N DC Motor Driver
+  * BRIEF INFORMATION: Drives L298N DC Motor Driver
+  * 				   Timer Channels MUST be in following order: A=1 to D=4
   *
   * Copyright (c) 2023 Lee Geon-goo.
   * All rights reserved.
@@ -11,19 +12,20 @@
   *********************************************************************************************
   */
 
-#include "main.h"
 #include "l298n.h"
 
 static struct L298nStats L298Nstat;
 static uint16_t spdMultr;
 static uint16_t spd16a;
 static uint16_t spd16b;
-static uint8_t timEna = FALSE;
+static _Bool timEna = FALSE;
 
 static TIM_HandleTypeDef* pTimHandle = NULL;
+static TIM_TypeDef* pTimInstance = NULL;
 
 void l298n_setHandle(TIM_HandleTypeDef* ph) {
 	pTimHandle = ph;
+	pTimInstance = ph->Instance;
 }
 
 void l298n_init() {
@@ -49,11 +51,11 @@ void l298n_init() {
 	}
 
 	// calculate timer period
-	spdMultr = (uint16_t)(L298N_TIM->ARR / 100);
+	spdMultr = (uint16_t)(pTimInstance->ARR / 100);
 
 	// init PWM: set to LOW
-	L298N_TIM->CCR1 = 0;
-	L298N_TIM->CCR2 = 0;
+	pTimInstance->CCR1 = 0;
+	pTimInstance->CCR2 = 0;
 }
 
 void l298n_enable() { // enable motor operation. This starts PWM generation.
@@ -81,12 +83,12 @@ void l298n_setSpeed(uint8_t motorNum, uint8_t spd) { // speed scale: 0(stop) to 
 	else if (motorNum == L298N_MOTOR_A) {
 		L298Nstat.spdA = spd;
 		spd16a = (uint16_t)(spd * spdMultr);
-		L298N_TIM->CCR1 = (uint32_t)spd16a;
+		pTimInstance->CCR1 = (uint32_t)spd16a;
 	}
 	else if (motorNum == L298N_MOTOR_B) {
 		L298Nstat.spdB = spd;
 		spd16b = (uint16_t)(spd * spdMultr);
-		L298N_TIM->CCR2 = (uint32_t)spd16b;
+		pTimInstance->CCR2 = (uint32_t)spd16b;
 	}
 }
 
