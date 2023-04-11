@@ -2,6 +2,7 @@
   *********************************************************************************************
   * NAME OF THE FILE : l298n.h
   * BRIEF INFORMATION: Drives L298N DC Motor Driver
+  * 				   Timer Channels MUST be in following order: A=1 to D=4
   *
   * Copyright (c) 2023 Lee Geon-goo.
   * All rights reserved.
@@ -14,6 +15,15 @@
 #ifndef L298N_H
 #define L298N_H
 
+#include "main.h"
+
+#ifndef FALSE
+#define FALSE 0
+#endif
+#ifndef TRUE
+#define TRUE 1
+#endif
+
 /* definitions */
 // DO NOT EDIT
 #define L298N_STOP 0
@@ -24,15 +34,11 @@
 #define L298N_MOTOR_B 1
 
 // edit here if system configuration is changed
-#define L298N_TIM TIM3 // CAUTION: PSC, ARR, CCR use 16b val, but stm32cubeide's typedef is 32b.
-#define L298N_IN_PORT GPIOC // C0~C3
-#define L298N_IN_1 GPIO_PIN_0
-#define L298N_IN_2 GPIO_PIN_1
-#define L298N_IN_3 GPIO_PIN_2
-#define L298N_IN_4 GPIO_PIN_3
-#define L298N_PWM_PORT GPIOA // A6, A7
-#define L298N_PWM_A GPIO_PIN_6 // CH1
-#define L298N_PWM_B GPIO_PIN_7 // CH2
+#define L298N_IN_PORT GPIOB
+#define L298N_IN_1 GPIO_PIN_4
+#define L298N_IN_2 GPIO_PIN_5
+#define L298N_IN_3 GPIO_PIN_6
+#define L298N_IN_4 GPIO_PIN_7
 
 /* exported struct */
 struct L298nStats {
