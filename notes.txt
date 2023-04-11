@@ -1,8 +1,72 @@
-!!!급하게 기능을 넣느라 코드가 난장판임. 3월 발표가 끝나면 코드 정리할 것!!!
-core 프로그램이 쓸데없이 커지고 opman과 scheduler는 굳이 core에서 분리할 필요가 없어보임
-core에서 놀이 패턴 구현, 수동 운전 등등의 부분은 app.c&h로 빼버리고, opman과 scheduler는 core에 통합하는 게 나아보임.
-
-딜레이 카운트용 타이머(11)은 밀리초 타이머로 바꿈... 나중에 ioc 파일 고쳐서 1밀리초마다 인터럽트 발생하게 바꿀 것
-
 ==== 설정 내용 ====
+시스템 클럭 40MHz
+(소스 HSI 16MHz * PLLN 10 / PLLR 4)
+APB1 40MHz, APB2 40MHz
+
+TIM1(Advanced): L298N 모터 제어용
+500Hz로 동작시킬 것
+PSC, ARR: 16b
+40,000,000Hz / PSC 40 / ARR 2000 = 500Hz
+
+TIM2(General): SG90 서보모터 제어용
+20Hz로 동작해야만 함(데이터시트 참고)
+PSC: 16b, ARR: 16b
+40,000,000Hz / PSC 40 / ARR 50000 = 20Hz
+듀티 최소: 1ms(5%)
+듀티 최대: 2ms(10%)
+CCR은 자동으로 계산하게 함: 헤더에는 퍼센티지, 소스에서 ARR / 듀티 퍼센티지 / 100로 계산 후 정수로 변환
+예: 최소일 때 50000 * 5 / 100 = CCRmin = 2500
+→ 2500 / 50000 = 5%, 20 * 5% = 1ms
+
+TIM6(Basic): 밀리초 타이머(작업 지연용)
+PSC, ARR: 16b
+40,000,000 / PSC 40 / ARR 1000 = 1000Hz
+
+TIM7(Basic): 1초 타이머(시간 경과 체크용)
+PSC, ARR: 16b
+40,000,000 / PSC 4000 / ARR 10000 = 1Hz
+
+TIM16(General): 톤 재생(PWM)
+주파수는 수시로 바꿀 것
+실제로 쓸 범위는 100~2000(98Hz: G2, 1976Hz: B6)
+드라이버 범위는 C2(65Hz)~B8(7902Hz)
+초깃값은 A4(440Hz)로
+오차를 줄여야 하니 PSC를 작게 ARR을 크게
+정수만 되니 PSC를 거치면 1,000,000Hz가 되게 → PSC 40이면 범위 안에서 구동 OK
+PSC, ARR: 16b
+40,000,000 / PSC 40 / ARR 2273 = 439.95Hz
+
+핀 설정
+GPIO OUT 설정: level low, mode output push pull, no pull-up & no pull-down, max out speed high
+GPIO IN 설정: pull-down
+
+PA0	SG90-A	(TIM2CH1 PWM)→간식문 모터
+PA1	SG90-B	(TIM2CH2 PWM)→예비
+PA2	USART2-TX
+PA3	USART2-RX
+PA4	GPIO IN 예비(다목적)
+PA5	Laser(GPIO OUT)
+PA6	Buzzer	(TIM16CH1 PWM)
+PA7	IR Sensor	(ADC1 IN12)
+PA8	L298N_A	(TIM1CH1 PWM)→왼쪽바퀴
+PA9	L298N_B	(TIM1CH2 PWM)→오른쪽바퀴
+PA10	RPI-foundCat(GPIO IN)
+PA11	RPI-SkdStart(GPIO OUT)
+PA12	RPI-Timeout	(GPIO OUT)
+PA13	SYS_JTCK-SWCLK
+PA14	SYS_JTCK-SWDIO
+PA15	GPIO OUT 예비(rpi 통신용)
+
+PB0	VIB Sensor	(GPIO IN)
+PB1	GPIO IN 예비 (H/W 제어용)
+PB3	SYS_JTDO-SWO
+PB4	L298N-IN1	(GPIO OUT)
+PB5	L298N-IN2	(GPIO OUT)
+PB6	L298N-IN3	(GPIO OUT)
+PB7	L298N-IN4	(GPIO OUT)
+
+PC14: GPIO OUT 예비(시스템제어) ※ output speed 저속만 됨
+PC15: GPIO IN 예비(시스템제어)
+
+PH3는 쓰지 않음
 
