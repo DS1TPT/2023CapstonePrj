@@ -16,6 +16,13 @@
 
 #include "main.h"
 
+#ifndef FALSE
+#define FALSE 0
+#endif
+#ifndef TRUE
+#define TRUE 1
+#endif
+
 #define _ASCII_NUMBER_FOR_PATTERN_CODE
 
 void app_start(); // start application. call this function in core
