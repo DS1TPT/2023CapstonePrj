@@ -3,6 +3,7 @@
   * NAME OF THE FILE : sg90.c
   * BRIEF INFORMATION: Drive SG90 servo motor
   * 				   This program can control up to 4 SG90s with timer 1.
+  * 				   Timer Channels MUST be in following order: A=1 to D=4
   *
   * Copyright (c) 2023 Lee Geon-goo.
   * All rights reserved.
@@ -12,19 +13,20 @@
   *********************************************************************************************
   */
 
-#include "main.h"
 #include "sg90.h"
 
 static struct SG90Stats SG;
 static float angleMultr;
 static uint16_t CCRmin;
 static uint16_t CCRmax;
-static uint8_t timEna = FALSE;
+static _Bool timEna = FALSE;
 
-static TIM_HandleTypeDef* pTimHandle;
+static TIM_HandleTypeDef* pTimHandle = NULL;
+static TIM_TypeDef* pTimInstance = NULL;
 
 void sg90_setHandle(TIM_HandleTypeDef* ph) {
 	pTimHandle = ph;
+	pTimInstance = ph->Instance;
 }
 
 void sg90_init() {
@@ -33,13 +35,13 @@ void sg90_init() {
 		HAL_TIM_Base_Start_IT(pTimHandle);
 		timEna = TRUE;
 	}
-	CCRmin = (uint16_t)(SG90_TIM->ARR * SG90_MIN_DUTY / 100);
-	CCRmax = (uint16_t)(SG90_TIM->ARR * SG90_MAX_DUTY / 100);
+	CCRmin = (uint16_t)(pTimInstance->ARR * SG90_MIN_DUTY / 100);
+	CCRmax = (uint16_t)(pTimInstance->ARR * SG90_MAX_DUTY / 100);
 	angleMultr = (CCRmax - CCRmin) / 180.0;
-	SG90_TIM->CCR1 = (uint32_t)CCRmin;
-	if (SG90_MOTOR_CNT >= 2) SG90_TIM->CCR2 = (uint32_t)CCRmin;
-	if (SG90_MOTOR_CNT >= 3) SG90_TIM->CCR3 = (uint32_t)CCRmin;
-	if (SG90_MOTOR_CNT >= 4) SG90_TIM->CCR4 = (uint32_t)CCRmin;
+	pTimInstance->CCR1 = (uint32_t)CCRmin;
+	if (SG90_MOTOR_CNT >= 2) pTimInstance->CCR2 = (uint32_t)CCRmin;
+	if (SG90_MOTOR_CNT >= 3) pTimInstance->CCR3 = (uint32_t)CCRmin;
+	if (SG90_MOTOR_CNT >= 4) pTimInstance->CCR4 = (uint32_t)CCRmin;
 
 	for (int i = 0; i < SG90_MOTOR_CNT; i++) {
 		SG.angle[i] = 0;
@@ -105,19 +107,19 @@ void sg90_setAngle(uint8_t motorNum, uint8_t angle) { // set angle
 
 	switch (motorNum) {
 	case SG90_MOTOR_A:
-		SG90_TIM->CCR1 = ccrval;
+		pTimInstance->CCR1 = ccrval;
 		SG.angle[SG90_MOTOR_A] = angle;
 		break;
 	case SG90_MOTOR_B:
-		SG90_TIM->CCR2 = ccrval;
+		pTimInstance->CCR2 = ccrval;
 		SG.angle[SG90_MOTOR_B] = angle;
 		break;
 	case SG90_MOTOR_C:
-		SG90_TIM->CCR3 = ccrval;
+		pTimInstance->CCR3 = ccrval;
 		SG.angle[SG90_MOTOR_C] = angle;
 		break;
 	case SG90_MOTOR_D:
-		SG90_TIM->CCR4 = ccrval;
+		pTimInstance->CCR4 = ccrval;
 		SG.angle[SG90_MOTOR_D] = angle;
 		break;
 	}
