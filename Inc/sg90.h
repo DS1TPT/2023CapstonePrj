@@ -1,8 +1,9 @@
 /**
   *********************************************************************************************
   * NAME OF THE FILE : sg90.h
-  * BRIEF INFORMATION: Drive SG90 servo motor
+  * BRIEF INFORMATION: Drives SG90 servo motor
   * 				   This program can control up to 4 SG90s with timer 1.
+  * 				   Timer Channels MUST be in following order: A=1 to D=4
   *
   * Copyright (c) 2023 Lee Geon-goo.
   * All rights reserved.
@@ -15,6 +16,15 @@
 #ifndef SG90_H
 #define SG90_H
 
+#include "main.h"
+
+#ifndef FALSE
+#define FALSE 0
+#endif
+#ifndef TRUE
+#define TRUE 1
+#endif
+
 /* definitions */
 // DO NOT EDIT
 #define SG90_MOTOR_A 0
@@ -25,13 +35,7 @@
 #define SG90_MAX_DUTY 10
 
 // edit here if system configuration is changed
-#define SG90_TIM TIM1 // CAUTION: PSC, ARR, CCR use 16b val, but stm32cubeide's typedef is 32b.
-#define SG90_MOTOR_CNT 2
-#define SG90_PWM_PORT GPIOA // A8, A9
-#define SG90_PWM_A GPIO_PIN_8 // CH1
-#define SG90_PWM_B GPIO_PIN_9 // CH2
-//#define SG90_PWM_C GPIO_PIN_ // CH3
-//#define SG90_PWM_D GPIO_PIN_ // CH4
+#define SG90_MOTOR_CNT 1 // order: A B C D. ex: MOTOR CNT == 2 then A and B will be used
 
 /* exported struct */
 struct SG90Stats {
