@@ -18,17 +18,26 @@
 #include "l298n.h"
 #include "sg90.h"
 
+#if defined _TEST_MODE_SEND_VIA_STLINK_SWO
+const _Bool isDebugModeDef = TRUE;
+#include <stdio.h>
+#elif defined _TEST_MODE_SEND_VIA_UART
+const _Bool isDebugModeDef = TRUE;
+#else
+const _Bool isDebugModeDef = FALSE;
+#endif
+
 // system variables
 //static uint8_t flagTimeElapsed = FALSE;
 //static uint8_t flagHibernate = FALSE;
-static uint8_t initState = FALSE;
-static uint8_t secTimEna = FALSE;
+static _Bool initState = FALSE;
+static _Bool secTimEna = FALSE;
 
 static uint8_t pendedOpcodeMem = 0; // bit-masked
 static core_statRetTypeDef (*arrRegdPendingOpHandlerFunc[8])();
 static core_statRetTypeDef (*arrRegdSecTimIntrHandlerFunc[8])();
 static volatile uint16_t timeMem[8] = { 0, };
-static uint8_t timEna = FALSE;
+static _Bool timEna = FALSE;
 
 static TIM_HandleTypeDef* pSecTimHandle = NULL;
 static TIM_HandleTypeDef* pMillisecTimHandle = NULL;
@@ -184,6 +193,29 @@ void core_call_pendingOpCancel(uint8_t opcode) {
 	pendedOpcodeMem = pendedOpcodeMem & ~opcode;
 }
 
+#if defined _TEST_MODE_SEND_VIA_STLINK_SWO
+int _write(int file, char *ptr, int len) {
+	for (int i= 0; i < len; i++) {
+		ITM_SendChar(*ptr++);
+	}
+	return len;
+}
+
+core_statRetTypeDef core_dbgTx(char *sz) {
+	uint16_t size = 0;
+	uint8_t* pu8 = (uint8_t*)sz;
+	if (sz == NULL || *sz == 0) return ERR;
+	while (1) { // get length
+		if (*(pu8++) == 0) break;
+		else size++;
+	}
+	if (!size) return ERR;
+
+	int retval = printf(sz);
+	if (retval != 0) return OK;
+	else return ERR;
+}
+#elif defined _TEST_MODE_SEND_VIA_UART
 core_statRetTypeDef core_dbgTx(char *sz) {
 	uint16_t size = 0;
 	uint32_t timeout = 0;
@@ -202,6 +234,11 @@ core_statRetTypeDef core_dbgTx(char *sz) {
 	if (retval == HAL_OK) return OK;
 	else return ERR;
 }
+#else
+core_statRetTypeDef core_dbgTx(char *sz) {
+	return ERR;
+}
+#endif
 
 core_statRetTypeDef core_call_secTimIntrRegister(core_statRetTypeDef(*pHandlerFunc)()) {
 	for (int i = 0; i < 8; i++) {
