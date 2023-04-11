@@ -1,6 +1,6 @@
 /**
   *********************************************************************************************
-  * NAME OF THE FILE : buzzer.h
+  * NAME OF THE FILE : buzzer.c
   * BRIEF INFORMATION: Drives piezo buzzer using PWM.
   * 				   This program can drive a buzzer.
   * 				   This program use 1 general or advanced timer
