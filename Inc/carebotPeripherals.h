@@ -1,7 +1,7 @@
 /**
   *********************************************************************************************
   * NAME OF THE FILE : carebotPeripherals.h
-  * BRIEF INFORMATION: drives peripheral devices
+  * BRIEF INFORMATION: peripheral device driver
   *
   * Copyright (c) 2023 Lee Geon-goo.
   * All rights reserved.
@@ -14,6 +14,13 @@
 #ifndef CAREBOTPERIPHERALS_H
 #define CAREBOTPERIPHERALS_H
 
+#ifndef FALSE
+#define FALSE 0
+#endif
+#ifndef TRUE
+#define TRUE 1
+#endif
+
 /* definitions */
 // FIXED VAL
 #define IR_SNSR_FAR 0
@@ -23,13 +30,11 @@
 #define IR_SNSR_MODE_FIND 2
 #define IR_SNSR_MODE_SNACK 3
 // config
-#define LASER_PORT GPIOC
-#define LASER_PIN GPIO_PIN_10
-#define LED_PORT GPIOC
+#define LASER_PORT GPIOA
+#define LASER_PIN GPIO_PIN_5
+//#define LED_PORT GPIO
 //#define LED_PIN GPIO_PIN_
-#define IR_SNSR_ADC ADC1
-#define IR_SNSR_CHA ADC_CHANNEL_8
-#define IR_SNSR_POLL_TIMEOUT 20
+#define IR_SNSR_POLL_TIMEOUT 10
 #define IR_SNSR_TRIG_DIST_OP 20.0
 #define IR_SNSR_TRIG_DIST_FIND 40.0
 #define IR_SNSR_TRIG_DIST_SNACK 15.0
