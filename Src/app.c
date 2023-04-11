@@ -31,8 +31,8 @@ const uint8_t MAN_ROT_SPD = 60; // RANGE: 6~114, EVEN NUMBER. AFFECTS AUTO SPEED
 const uint8_t MAN_DRV_SPD = 100; // RANGE: 6~114, EVEN NUMBER. AFFECTS AUTO SPEED
 const uint8_t SPD_ADDEND = 40; // THIS NUMBER MUST NOT EXCEED: 254 - MANUAL SPEED * 2
 const uint8_t SPD_SUBTRAHEND = 10; // THIS NUMBER MUST BE LESS THAN: MANUAL SPEED / 4
-//const uint8_t DEF_ANG_A = 45; // default angle of toy motor, WRITE RETRACTED ANGLE
-const uint8_t DEF_ANG_B = 30; // default angle of snack motor
+const uint8_t DEF_ANG_A = 30; // default angle of snack motor
+//const uint8_t DEF_ANG_B = ; // reserve servo b
 const uint16_t OP_SNACK_RET_MOTOR_WAITING_TIME = 500;
 const int32_t PATTERN_WAIT_AND_FLEE_WAIT_TIME = 20; // RANGE: 1 ~ 60, in seconds
 
@@ -42,11 +42,8 @@ const uint8_t AUTO_DEF_DRV_SPD = MAN_DRV_SPD / 2;
 const uint8_t AUTO_MIN_ROT_SPD = (uint8_t)((float)AUTO_DEF_ROT_SPD / 2.0) - (((float)AUTO_DEF_ROT_SPD / 2.0 > 0) ? 0 : 1);
 const uint8_t AUTO_MIN_DRV_SPD = (uint8_t)((float)AUTO_DEF_DRV_SPD / 2.0) - (((float)AUTO_DEF_ROT_SPD / 2.0 > 0) ? 0 : 1);
 const uint8_t SPD_OVERSHOOT_ADDEND = ((AUTO_DEF_ROT_SPD > AUTO_DEF_DRV_SPD) ? (254 - AUTO_DEF_DRV_SPD * 4) : (254 - AUTO_DEF_ROT_SPD * 4));
-//const uint8_t TOY_ANG_DRAW = DEF_ANG_A + 90; // max angle(draw) of toy motor
-//const uint8_t TOY_ANG_HALF = DEF_ANG_A + 45; // half draw angle
-//const uint8_t TOY_ANG_RETRACT = DEF_ANG_A;
-const uint8_t SNACK_ANG_RDY = DEF_ANG_B;
-const uint8_t SNACK_ANG_GIVE = DEF_ANG_B + 90;
+const uint8_t SNACK_ANG_RDY = DEF_ANG_A;
+const uint8_t SNACK_ANG_GIVE = DEF_ANG_A + 90;
 
 // system variables
 static uint8_t flagTimeElapsed = FALSE;
@@ -387,8 +384,7 @@ static void manualDrive() {
 #endif
 	// enable motor first
 	l298n_enable();
-	//sg90_enable(SG90_MOTOR_A, DEF_ANG_A);
-	sg90_enable(SG90_MOTOR_B, DEF_ANG_B);
+	sg90_enable(SG90_MOTOR_A, DEF_ANG_A);
 	while (1) {
 		if (rpi_serialDtaAvailable()) {
 			if (rpi_getSerialDta(&rpidta)) {
@@ -445,8 +441,7 @@ static void manualDrive() {
 				else if (rpidta.type == TYPE_SYS && rpidta.container[0] == '2') {
 					// stop manual drive
 					l298n_disable();
-					//sg90_disable(SG90_MOTOR_A);
-					sg90_disable(SG90_MOTOR_B);
+					sg90_disable(SG90_MOTOR_A);
 #ifdef _TEST_MODE_ENABLED
 					core_dbgTx("END MANUAL MODE\r\n");
 #endif
@@ -463,8 +458,7 @@ static void autoDrive() {
 
 	// enable motor
 	l298n_enable();
-	//sg90_enable(SG90_MOTOR_A, DEF_ANG_A);
-	sg90_enable(SG90_MOTOR_B, DEF_ANG_B);
+	sg90_enable(SG90_MOTOR_A, DEF_ANG_A);
 
 	// call & find cat
 	rpi_sendPin(RPI_PINCODE_O_SCHEDULE_EXE);
@@ -480,9 +474,6 @@ static void autoDrive() {
 			break;
 		}
 	}
-
-	// draw toy
-	// sg90_setAngle(SG90_MOTOR_A, TOY_ANG_DRAW);
 
 	// play
 	while (1) {
@@ -546,9 +537,8 @@ static void autoDrive() {
 
 	}
 
-	// retract toy and disable servo
-	//sg90_disable(SG90_MOTOR_A);
-	sg90_disable(SG90_MOTOR_B);
+	// disable servo
+	sg90_disable(SG90_MOTOR_A);
 
 	// move away from cat(park near a wall)
 	while (1) {
@@ -643,7 +633,7 @@ static void appMain() {
 }
 
 static core_statRetTypeDef app_pendingOpTimeoutHandler() {
-	sg90_setAngle(SG90_MOTOR_B, SNACK_ANG_RDY);
+	sg90_setAngle(SG90_MOTOR_A, SNACK_ANG_RDY);
 	return OK;
 
 }
