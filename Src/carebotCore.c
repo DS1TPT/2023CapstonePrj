@@ -183,7 +183,7 @@ core_statRetTypeDef core_call_pendingOpExeImmediate(uint8_t opcode) {
 
     timeMem[getBitPos(opcode)] = 0;
     pendedOpcodeMem = pendedOpcodeMem & ~opcode;
-    app_opTimeout(opcode);
+    arrRegdPendingOpHandlerFunc[opcode]();
     return OK;
 }
 
@@ -280,6 +280,7 @@ void core_start() {
 	rpi_init();
 	l298n_init();
 	sg90_init();
+	buzzer_init();
 	initState = TRUE;
 
 	pendedOpcodeMem = 0;
