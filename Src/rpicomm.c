@@ -1,8 +1,7 @@
 /**
   *********************************************************************************************
-  * NAME OF THE FILE : rpicomm.c
-  * BRIEF INFORMATION: for communications between stm32f411re nucleo board
-  * 			  	   and raspberry pi via GPIO pins and UART.
+  * NAME OF THE FILE : carebotPeripherals.c
+  * BRIEF INFORMATION: peripheral device driver
   *
   * Copyright (c) 2023 Lee Geon-goo.
   * All rights reserved.
@@ -12,102 +11,63 @@
   *********************************************************************************************
   */
 
-#include "carebotCore.h"
-#include "rpicomm.h"
+#include "main.h"
+#include "carebotPeripherals.h"
+#include <math.h> // to use pow()
 
-static UART_HandleTypeDef* pUartHandle = NULL;
+static ADC_HandleTypeDef* pAdcHandle;
+static uint32_t adcDta = 0;
+static float distCM = 0.0; // Cortex-M4 has single precision FPU
+static HAL_StatusTypeDef halStat;
 
-static struct SerialDta UARTdta;
-static uint8_t rxBuf[DTA_LEN + 1] = { 0, };
-//static uint8_t txBuf[8] = { 0, };
-
-static uint8_t opcode = 0;
-
-void rpi_setHandle(UART_HandleTypeDef* ph) {
-	pUartHandle = ph;
+void periph_setHandle(ADC_HandleTypeDef* ph) {
+	pAdcHandle = ph;
 }
 
-int rpi_getSerialDta(struct SerialDta* pDest) {
-	if (UARTdta.available) { // has new received data
-		*pDest = UARTdta; // copy from internal var to dest var
-		UARTdta.available = 0; // mark unavailable
-		return 1;
-	}
-	else return 0;
+void periph_init() {
+	HAL_GPIO_WritePin(LASER_PORT, LASER_PIN, GPIO_PIN_RESET);
+	//HAL_GPIO_WritePin(LED_PORT, LED_PIN, GPIO_PIN_SET);
+	HAL_ADC_Start(pAdcHandle);
 }
 
-uint8_t rpi_getPinDta() {
-	uint8_t dta = 0;
-	if (HAL_GPIO_ReadPin(RPI_PIN_IN_PORT, RPI_PIN_IN_FOUNDCAT) == GPIO_PIN_SET)
-		dta |= RPI_PINCODE_I_FOUNDCAT;
-	else dta &= ~(RPI_PINCODE_I_FOUNDCAT);
-	// add more code as needed
-	return dta;
+void periph_laser_on() {
+	HAL_GPIO_WritePin(LASER_PORT, LASER_PIN, GPIO_PIN_SET);
 }
 
-int rpi_serialDtaAvailable() { // returns zero if not available
-	if (UARTdta.available) return 1;
-	else return 0;
+void periph_laser_off() {
+	HAL_GPIO_WritePin(LASER_PORT, LASER_PIN, GPIO_PIN_RESET);
 }
 
-/*
-int rpi_tcpipRespond(uint8_t isErr) { // send RESP pkt to client app. returns OK on success
-	uint8_t buf[8] = { 0, };
-	buf[0] = 0xFF;
-	if (!isErr) buf[1] = 0xFF;
-	uint32_t txRes = HAL_UART_Transmit(pUartHandle, buf, 8, 20);
-	if (txRes == HAL_OK) return OK;
-	else return ERR;
-}
-*/
-
-void rpi_RxCpltCallbackHandler() {
-	UARTdta.available = 1; // mark available
-	UARTdta.type = rxBuf[0]; // copy data from buffer to internal var
-	for (int i = 0; i < DTA_LEN - 1; i++)
-		UARTdta.container[i] = rxBuf[i + 1];
-	UARTdta.container[7] = 0;
-	for (int i = 0; i < DTA_LEN + 1; i++) // clr buf
-		rxBuf[i] = 0;
-	HAL_UART_Receive_IT(pUartHandle, rxBuf, DTA_LEN); // restart rx
+_Bool periph_isVibration() {
+	return (HAL_GPIO_ReadPin(VIB_SNSR_PORT, VIB_SNSR_PIN) == GPIO_PIN_SET ? TRUE : FALSE);
 }
 
-void rpi_sendPin(int code) {
-	core_call_pendingOpCancel(opcode);
-	switch (code) {
-	case RPI_PINCODE_O_SCHEDULE_EXE:
-		HAL_GPIO_WritePin(RPI_PIN_OUT_PORT, RPI_PIN_OUT_SCHEDULE_EXE, GPIO_PIN_SET);
+int periph_irSnsrChk(int mode) {
+	halStat = HAL_ADC_PollForConversion(pAdcHandle, IR_SNSR_POLL_TIMEOUT);
+	if (halStat != HAL_OK) // couldn't poll
+		return IR_SNSR_ERR;
+	adcDta = HAL_ADC_GetValue(pAdcHandle); // get data
+	/* equation for GP2Y0A02 (y: voltage, x = cm)
+	 * y = 32.467x^-0.8504
+	 * x = 59.88676548 / (y^1.17591721)
+	 * range of x: 15cm(min) or 20cm(typ) to 150cm
+	 * STM32 ADC res = 12b. 3.3V = 4095, 0V = 0.
+	*/
+
+	distCM = 59.88676548 / pow(((float)adcDta / 4095.0 * 3.3), 1.17591721); // calculate distance
+
+	switch (mode) { // decide near/far according to pre-set distance of a mode
+	case IR_SNSR_MODE_OP:
+		if (distCM <= IR_SNSR_TRIG_DIST_OP) return IR_SNSR_NEAR;
+		else return IR_SNSR_FAR;
 		break;
-	case RPI_PINCODE_O_SCHEDULE_END:
-		HAL_GPIO_WritePin(RPI_PIN_OUT_PORT, RPI_PIN_OUT_SCHEDULE_END, GPIO_PIN_SET);
+	case IR_SNSR_MODE_FIND:
+		if (distCM <= IR_SNSR_TRIG_DIST_FIND) return IR_SNSR_NEAR;
+		else return IR_SNSR_FAR;
 		break;
-	case RPI_PINCODE_O_FIND_CAT_TIMEOUT:
-		HAL_GPIO_WritePin(RPI_PIN_OUT_PORT, RPI_PIN_OUT_FIND_CAT_TIMEOUT, GPIO_PIN_SET);
+	case IR_SNSR_MODE_SNACK:
+		if (distCM <= IR_SNSR_TRIG_DIST_SNACK) return IR_SNSR_NEAR;
+		else return IR_SNSR_FAR;
 		break;
 	}
-	core_call_pendingOpAdd(opcode, RPI_PIN_SEND_WAITING_TIME);
-}
-
-core_statRetTypeDef rpi_pendingOpTimeoutHandler() {
-	HAL_GPIO_WritePin(RPI_PIN_OUT_PORT, RPI_PIN_OUT_SCHEDULE_EXE, GPIO_PIN_RESET);
-	HAL_GPIO_WritePin(RPI_PIN_OUT_PORT, RPI_PIN_OUT_SCHEDULE_END, GPIO_PIN_RESET);
-	HAL_GPIO_WritePin(RPI_PIN_OUT_PORT, RPI_PIN_OUT_FIND_CAT_TIMEOUT, GPIO_PIN_RESET);
-	return OK;
-}
-
-void rpi_init() {
-	core_statRetTypeDef retval = core_call_pendingOpRegister(&opcode, &rpi_pendingOpTimeoutHandler);
-	if (retval != OK) {
-#ifdef _TEST_MODE_ENABLED
-		core_dbgTx("\r\n?FAILED TO REGISTER RPI PENDING OP HANDLER FUNCTION OF RPICOMM\r\n");
-		while (1) {
-
-		}
-#endif
-	}
-	UARTdta.available = 0;
-	for (int i = 0; i < 9; i++)
-		rxBuf[i] = 0;
-	//pinDta = 0;
-	HAL_UART_Receive_IT(pUartHandle, rxBuf, DTA_LEN);
 }
