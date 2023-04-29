@@ -34,6 +34,8 @@ const uint8_t SPD_SUBTRAHEND = 10; // THIS NUMBER MUST BE LESS THAN: MANUAL SPEE
 const uint8_t DEF_ANG_A = 30; // default angle of snack motor
 //const uint8_t DEF_ANG_B = ; // reserve servo b
 const uint16_t OP_SNACK_RET_MOTOR_WAITING_TIME = 500;
+const int32_t CAT_SEARCH_WAIT_TIME = 20; // in seconds
+const int32_t VIB_WAIT_TIME = 600; // in seconds
 const int32_t PATTERN_WAIT_AND_FLEE_WAIT_TIME = 20; // RANGE: 1 ~ 60, in seconds
 
 // derived properties (NOT EDITABLE)
@@ -46,7 +48,9 @@ const uint8_t SNACK_ANG_RDY = DEF_ANG_A;
 const uint8_t SNACK_ANG_GIVE = DEF_ANG_A + 90;
 
 // system variables
-static uint8_t flagTimeElapsed = FALSE;
+static uint8_t flagSkdTimeElapsed = FALSE;
+static uint8_t flagVibWaitTimeout = FALSE;
+static uint8_t flagCatSearchTimeout = FALSE;
 static uint8_t flagAutorun = FALSE;
 static uint8_t recvScheduleMode = FALSE;
 static uint8_t initState = FALSE;
@@ -54,10 +58,14 @@ static uint8_t initState = FALSE;
 static struct dtaStructQueueU8 patternQueue;
 static uint8_t speed = 0; // 0 ~ 4.
 static int32_t skdWaitTime = 0;
+static int32_t vibWaitTime = 0;
+static int32_t catSearchWaitTime = 0;
 static int32_t skdDuration = 0;
 static int skdSpd = 0;
 static int skdSnackIntv = 0;
 static _Bool skdIsSet = FALSE;
+static _Bool catSearchIsSet = FALSE;
+static _Bool vibWaitIsSet = FALSE;
 
 static uint8_t opcodePendingOp = 0;
 
@@ -368,6 +376,22 @@ static void exePattern(int code, int mode) {
 		HAL_Delay(400);
 		for (int32_t i32 = 0; i32 < rptNum; i32++) {
 			// implementation here
+			l298n_setRotation(L298N_MOTOR_A, L298N_CW); // left slow
+			l298n_setRotation(L298N_MOTOR_B, L298N_CW);
+			l298n_setSpeed(L298N_MOTOR_A, rotSpd);
+			l298n_setSpeed(L298N_MOTOR_B, rotSpd);
+			HAL_Delay(1000);
+			l298n_setRotation(L298N_MOTOR_A, L298N_STOP);
+			l298n_setRotation(L298N_MOTOR_B, L298N_STOP);
+			HAL_Delay(500);
+			l298n_setRotation(L298N_MOTOR_A, L298N_CW); // right fast
+			l298n_setRotation(L298N_MOTOR_B, L298N_CW);
+			l298n_setSpeed(L298N_MOTOR_A, rotSpd);
+			l298n_setSpeed(L298N_MOTOR_B, rotSpd);
+			HAL_Delay(500);
+			l298n_setRotation(L298N_MOTOR_A, L298N_STOP);
+			l298n_setRotation(L298N_MOTOR_B, L298N_STOP);
+			HAL_Delay(500);
 		}
 		break;
 	}
@@ -455,22 +479,47 @@ static void manualDrive() {
 static void autoDrive() {
 	//uint8_t rpiPinDta = 0;
 	uint8_t patternCode = 0, patternCodePrev = 0;
+	int snackIntvCnt = 0;
 
 	// enable motor
 	l298n_enable();
 	sg90_enable(SG90_MOTOR_A, DEF_ANG_A);
 
+	// set cat searching flag
+	catSearchWaitTime = CAT_SEARCH_WAIT_TIME;
+	catSearchIsSet = TRUE;
+	flagCatSearchTimeout = FALSE;
+
 	// call & find cat
 	rpi_sendPin(RPI_PINCODE_O_SCHEDULE_EXE);
+	HAL_Delay(1000);
+
+	l298n_setRotation(L298N_MOTOR_A, L298N_CW); // rotate left slowly, to find cat
+	l298n_setRotation(L298N_MOTOR_B, L298N_CW);
+	l298n_setSpeed(L298N_MOTOR_A, AUTO_MIN_ROT_SPD);
+	l298n_setSpeed(L298N_MOTOR_A, AUTO_MIN_ROT_SPD);
 	while (1) {
-		/*
-		l298n_setRotation(L298N_MOTOR_A, L298N_CW); // left
-		l298n_setRotation(L298N_MOTOR_B, L298N_CW);
-		l298n_setSpeed(L298N_MOTOR_A, AUTO_DEF_ROT_SPD);
-		l298n_setSpeed(L298N_MOTOR_A, AUTO_DEF_ROT_SPD);
-		*/
-		if (rpi_getPinDta() & RPI_PINCODE_I_FOUNDCAT) {
+		if (flagCatSearchTimeout) { // couldn't find cat, start wait-calling mode
+			l298n_setRotation(L298N_MOTOR_A, L298N_STOP); // stop first
+			l298n_setRotation(L298N_MOTOR_B, L298N_STOP);
+			// set tone
+			// set sound on/off to true
+			// set timeout time and marker
+			while (1) {
+				// check for vibration every 100ms
+				if (periph_isVibration == TRUE) { // detected vibration
+
+				}
+				// check for timeout
+				if (flagVibWaitTimeout == TRUE) {
+					// do something
+				}
+			}
+
+		}
+		if (rpi_getPinDta() & RPI_PINCODE_I_FOUNDCAT) { // cat is found
 			// do something
+
 			break;
 		}
 	}
@@ -541,8 +590,22 @@ static void autoDrive() {
 	sg90_disable(SG90_MOTOR_A);
 
 	// move away from cat(park near a wall)
-	while (1) {
+	// for safety, if robot couldn't find an object with ir prox snsr for more than 15 sec,
+	// abort wall-searching and park
+	l298n_setRotation(L298N_MOTOR_A, L298N_CCW); // forward, slow
+	l298n_setRotation(L298N_MOTOR_B, L298N_CW);
+	l298n_setSpeed(L298N_MOTOR_A, AUTO_MIN_DRV_SPD);
+	l298n_setSpeed(L298N_MOTOR_B, AUTO_MIN_DRV_SPD);
 
+	unsigned parkPeriodCnt;
+	parkPeriodCnt = 0;
+	while (1) {
+		if (periph_irSnsrChk(IR_SNSR_MODE_OP) == IR_SNSR_NEAR || parkPeriodCnt >= 150) {
+			l298n_setRotation(L298N_MOTOR_A, L298N_STOP);
+			l298n_setRotation(L298N_MOTOR_B, L298N_STOP);
+		}
+		HAL_Delay(100);
+		parkPeriodCnt++;
 	}
 
 	// after parking, turn off motor
@@ -576,6 +639,7 @@ static void appMain() {
 				case TYPE_SCHEDULE_TIME:
 					if (!recvScheduleMode) break;
 					skdWaitTime = atoi32(rpidta.container);
+					skdIsSet = TRUE;
 					break;
 				case TYPE_SCHEDULE_PATTERN:
 					if (!recvScheduleMode) break;
@@ -623,8 +687,9 @@ static void appMain() {
 		}
 		// check if schedule is set
 		// check for schedule. process schedule if time has been elapsed
-		if (flagTimeElapsed) {
-			flagTimeElapsed = FALSE; // reset flag first
+		if (flagSkdTimeElapsed) {
+			flagSkdTimeElapsed = FALSE; // reset flag first
+			skdIsSet = FALSE;
 			flagAutorun = TRUE;
 			autoDrive();
 			flagAutorun = FALSE;
@@ -639,8 +704,27 @@ static core_statRetTypeDef app_pendingOpTimeoutHandler() {
 }
 
 core_statRetTypeDef app_secTimCallbackHandler() {
-	if(--skdWaitTime <= 0) flagTimeElapsed = TRUE;
-	else flagTimeElapsed = FALSE;
+	if (skdIsSet) {
+		if (--skdWaitTime <= 0) {
+			flagSkdTimeElapsed = TRUE;
+			skdWaitTime = 0;
+		}
+		else flagSkdTimeElapsed = FALSE;
+	}
+	if (catSearchIsSet) {
+		if (--catSearchWaitTime <= 0) {
+			flagCatSearchTimeout = TRUE;
+			catSearchWaitTime = 0;
+		}
+		else flagCatSearchTimeout = FALSE;
+	}
+	if (vibWaitIsSet) {
+		if (--vibWaitTime <= 0) {
+			flagVibWaitTimeout = TRUE;
+			vibWaitTime = 0;
+		}
+		else flagVibWaitTimeout = FALSE;
+	}
 	return OK;
 }
 
@@ -679,5 +763,13 @@ void app_start() {
 	skdSnackIntv = 0;
 	skdIsSet = FALSE;
 	initState = TRUE;
+
+	HAL_Delay(300);
+	buzzer_setTone(toneA5); // notify boot success
+	buzzer_setDuty(50);
+	buzzer_unmute();
+	HAL_Delay(250);
+	buzzer_mute();
+
 	appMain();
 }
