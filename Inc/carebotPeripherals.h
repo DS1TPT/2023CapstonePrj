@@ -32,6 +32,8 @@
 // config
 #define LASER_PORT GPIOA
 #define LASER_PIN GPIO_PIN_5
+#define VIB_SNSR_PORT GPIOB
+#define VIB_SNSR_PIN GPIO_PIN_0
 //#define LED_PORT GPIO
 //#define LED_PIN GPIO_PIN_
 #define IR_SNSR_POLL_TIMEOUT 10
@@ -48,6 +50,7 @@ void periph_setHandle(ADC_HandleTypeDef* ph);
 void periph_init();
 void periph_laser_on();
 void periph_laser_off();
+_Bool periph_isVibration();
 int periph_irSnsrChk(int mode);
 
 #endif
