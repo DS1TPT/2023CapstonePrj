@@ -26,6 +26,8 @@
 
 /* definitions */
 // DO NOT EDIT
+#define L298N_MAX_SPD 100
+
 #define L298N_STOP 0
 #define L298N_CW 1
 #define L298N_CCW 2
@@ -56,7 +58,7 @@ void l298n_setHandle(TIM_HandleTypeDef* ph);
 void l298n_init();
 void l298n_enable(); // enable motor operation. This starts PWM generation
 void l298n_disable(); // implies setRotation( , STOP): disable motor operation. This stops PWM generation
-void l298n_setSpeed(uint8_t motorNum, uint8_t spd); // speed scale: 0(stop) to 255(max.)
+void l298n_setSpeed(uint8_t motorNum, uint8_t spd); // speed scale: 0(stop) to 100(max.)
 void l298n_setRotation(uint8_t motorNum, uint8_t dir); // implies setSpeed(motorNum, 0): set rotation CW or CCW.
 struct L298nStats l298n_getStat(); // get status struct data
 
