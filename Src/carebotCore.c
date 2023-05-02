@@ -261,6 +261,10 @@ core_statRetTypeDef core_call_secTimIntrUnregister(core_statRetTypeDef(*pHandler
 	return ERR; // function not found
 }
 
+void core_call_delayms(uint32_t ms) {
+	HAL_Delay(ms);
+}
+
 void core_setHandleDebugUART(UART_HandleTypeDef* ph) {
 	pDbgUartHandle = ph;
 }
