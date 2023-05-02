@@ -89,6 +89,7 @@ void core_call_pendingOpCancel(uint8_t opcode);
 // time support
 core_statRetTypeDef core_call_secTimIntrRegister(core_statRetTypeDef(*pHandlerFunc)());
 core_statRetTypeDef core_call_secTimIntrUnregister(core_statRetTypeDef(*pHandlerFunc)());
+void core_call_delayms(uint32_t ms);
 
 // misc support
 core_statRetTypeDef core_dbgTx(char *sz);
