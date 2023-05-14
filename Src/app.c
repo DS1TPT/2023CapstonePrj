@@ -28,8 +28,7 @@ struct SerialDta rpidta;
 #define AUTOPLAY_STATUS_DO 1
 #define AUTOPLAY_STATUS_END 2
 
-// for testing this to test connection(received uart data will be sent to debug uart port)
-//#define _TEST_MODE_ENABLED
+/* TEST MODE can be disabled by commenting some lines at: carebotCore.h */
 
 // for audible execution: (AUTODRIVE MODE AND COMM ONLY) notify what's going on using beep.
 #define _AUDIBLE_EXECUTION_ENABLED
