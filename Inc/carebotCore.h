@@ -30,12 +30,12 @@
 #define TRUE 1
 #endif
 
-// for tesing. defining this will make robot to send program execution status via Serial.
-#define _TEST_MODE_ENABLED
+/* for tesing. defining this will make robot to send program execution status via Serial. */
+//#define _TEST_MODE_ENABLED
 // un-comment this to use UART
-// #define _TEST_MODE_SEND_VIA_UART
+//#define _TEST_MODE_SEND_VIA_UART
 // un-comment this to use ST-LINK SWO
-#define _TEST_MODE_SEND_VIA_STLINK_SWO
+//#define _TEST_MODE_SEND_VIA_STLINK_SWO
 
 /* definitions */
 #define DTA_STRUCT_QUEUE_SIZE 128
