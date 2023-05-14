@@ -92,6 +92,8 @@ core_statRetTypeDef core_call_secTimIntrUnregister(core_statRetTypeDef(*pHandler
 void core_call_delayms(uint32_t ms);
 
 // misc support
+core_statRetTypeDef core_call_uartHandlerRegister(core_statRetTypeDef(*pHandlerFunc)(UART_HandleTypeDef *huart));
+core_statRetTypeDef core_call_uartHandlerUnregister(core_statRetTypeDef(*pHandlerFunc)(UART_HandleTypeDef *huart));
 core_statRetTypeDef core_dbgTx(char *sz);
 
 //void core_callbackHandler();
