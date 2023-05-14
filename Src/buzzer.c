@@ -67,18 +67,18 @@ void buzzer_unmute() {
 void buzzer_setTone(buzzerToneARRvalTypeDef toneCode) {
 	if (initStat == FALSE) return;
 	pTimInstance->ARR = toneCode;
-	pTimInstance->CCR1 = (uint16_t)((float)pTimInstance->ARR / ((float)duty / 100.0));
+	pTimInstance->CCR1 = (uint16_t)((float)pTimInstance->ARR * ((float)duty / 100.0));
 }
 
 void buzzer_setFreq(uint16_t freq) {
 	if (freq > 10000 || freq < 60) return;
 	// arr = 1,000,000 / freq
 	pTimInstance->ARR = (uint16_t)(1000000 / (uint16_t)((float)freq + 0.5));
-	pTimInstance->CCR1 = (uint16_t)((float)pTimInstance->ARR / ((float)duty / 100.0));
+	pTimInstance->CCR1 = (uint16_t)((float)pTimInstance->ARR * ((float)duty / 100.0));
 }
 
 void buzzer_setDuty(uint8_t dutyRatio) {
 	if (dutyRatio < 5 || dutyRatio > 50) return;
 	duty = dutyRatio;
-	pTimInstance->CCR1 = (uint16_t)((float)pTimInstance->ARR / ((float)duty / 100.0));
+	pTimInstance->CCR1 = (uint16_t)((float)pTimInstance->ARR * ((float)duty / 100.0));
 }
