@@ -1,6 +1,6 @@
 /**
   *********************************************************************************************
-  * NAME OF THE FILE : carebotPeripherals.h
+  * NAME OF THE FILE : carebotPeripherals.c
   * BRIEF INFORMATION: peripheral device driver
   *
   * Copyright (c) 2023 Lee Geon-goo.
@@ -11,46 +11,64 @@
   *********************************************************************************************
   */
 
-#ifndef CAREBOTPERIPHERALS_H
-#define CAREBOTPERIPHERALS_H
+#include "main.h"
+#include "carebotPeripherals.h"
+#include <math.h> // to use pow()
 
-#ifndef FALSE
-#define FALSE 0
-#endif
-#ifndef TRUE
-#define TRUE 1
-#endif
+static ADC_HandleTypeDef* pAdcHandle;
+static uint32_t adcDta = 0;
+static float distCM = 0.0; // Cortex-M4 has single precision FPU
+static HAL_StatusTypeDef halStat;
 
-/* definitions */
-// FIXED VAL
-#define IR_SNSR_FAR 0
-#define IR_SNSR_NEAR 1
-#define IR_SNSR_ERR -1
-#define IR_SNSR_MODE_OP 1
-#define IR_SNSR_MODE_FIND 2
-#define IR_SNSR_MODE_SNACK 3
-// config
-#define LASER_PORT GPIOA
-#define LASER_PIN GPIO_PIN_5
-#define VIB_SNSR_PORT GPIOB
-#define VIB_SNSR_PIN GPIO_PIN_0
-//#define LED_PORT GPIO
-//#define LED_PIN GPIO_PIN_
-#define IR_SNSR_POLL_TIMEOUT 10
-#define IR_SNSR_TRIG_DIST_OP 20.0
-#define IR_SNSR_TRIG_DIST_FIND 40.0
-#define IR_SNSR_TRIG_DIST_SNACK 15.0
+void periph_setHandle(ADC_HandleTypeDef* ph) {
+	pAdcHandle = ph;
+}
 
-/* exported struct */
+void periph_init() {
+	HAL_GPIO_WritePin(LASER_PORT, LASER_PIN, GPIO_PIN_RESET);
+	//HAL_GPIO_WritePin(LED_PORT, LED_PIN, GPIO_PIN_SET);
+	HAL_ADC_Start(pAdcHandle);
+}
 
-/* exported vars */
+void periph_laser_on() {
+	HAL_GPIO_WritePin(LASER_PORT, LASER_PIN, GPIO_PIN_SET);
+}
 
-/* exported func prototypes */
-void periph_setHandle(ADC_HandleTypeDef* ph);
-void periph_init();
-void periph_laser_on();
-void periph_laser_off();
-_Bool periph_isVibration();
-int periph_irSnsrChk(int mode);
+void periph_laser_off() {
+	HAL_GPIO_WritePin(LASER_PORT, LASER_PIN, GPIO_PIN_RESET);
+}
 
-#endif
+_Bool periph_isVibration() {
+	return (HAL_GPIO_ReadPin(VIB_SNSR_PORT, VIB_SNSR_PIN) == GPIO_PIN_SET ? FALSE : TRUE);
+}
+
+int periph_irSnsrChk(int mode) {
+	halStat = HAL_ADC_PollForConversion(pAdcHandle, IR_SNSR_POLL_TIMEOUT);
+	if (halStat != HAL_OK) // couldn't poll
+		return IR_SNSR_ERR;
+	adcDta = HAL_ADC_GetValue(pAdcHandle); // get data
+	/* equation for GP2Y0A02 (y: voltage, x = cm)
+	 * y = 32.467x^-0.8504
+	 * x = 59.88676548 / (y^1.17591721)
+	 * range of x: 15cm(min) or 20cm(typ) to 150cm
+	 * STM32 ADC res = 12b. 3.3V = 4095, 0V = 0.
+	*/
+
+	distCM = 59.88676548 / pow(((float)adcDta / 4095.0 * 3.3), 1.17591721); // calculate distance
+
+	switch (mode) { // decide near/far according to pre-set distance of a mode
+	case IR_SNSR_MODE_OP:
+		if (distCM <= IR_SNSR_TRIG_DIST_OP) return IR_SNSR_NEAR;
+		else return IR_SNSR_FAR;
+		break;
+	case IR_SNSR_MODE_FIND:
+		if (distCM <= IR_SNSR_TRIG_DIST_FIND) return IR_SNSR_NEAR;
+		else return IR_SNSR_FAR;
+		break;
+	case IR_SNSR_MODE_SNACK:
+		if (distCM <= IR_SNSR_TRIG_DIST_SNACK) return IR_SNSR_NEAR;
+		else return IR_SNSR_FAR;
+		break;
+	}
+	return IR_SNSR_ERR;
+}
