@@ -36,11 +36,12 @@
 #define L298N_MOTOR_B 1
 
 // edit here if system configuration is changed
-#define L298N_IN_PORT GPIOB
+#define L298N_IN_PORT_A GPIOB
+#define L298N_IN_PORT_B GPIOB
 #define L298N_IN_1 GPIO_PIN_4
 #define L298N_IN_2 GPIO_PIN_5
-#define L298N_IN_3 GPIO_PIN_6
-#define L298N_IN_4 GPIO_PIN_7
+#define L298N_IN_3 GPIO_PIN_1
+#define L298N_IN_4 GPIO_PIN_3
 
 /* exported struct */
 struct L298nStats {
