@@ -24,8 +24,15 @@ struct SerialDta rpidta;
 #define PATTERN_EXE_MODE_AUTO 0
 #define PATTERN_EXE_MODE_MAN 1
 
+#define AUTOPLAY_STATUS_BEGIN 0
+#define AUTOPLAY_STATUS_DO 1
+#define AUTOPLAY_STATUS_END 2
+
 // for testing this to test connection(received uart data will be sent to debug uart port)
-#define _TEST_MODE_ENABLED
+//#define _TEST_MODE_ENABLED
+
+// for audible execution: (AUTODRIVE MODE AND COMM ONLY) notify what's going on using beep.
+#define _AUDIBLE_EXECUTION_ENABLED
 
 // system properties (editable)
 const uint8_t MAN_ROT_SPD = 20; // RANGE: 4~44, EVEN NUMBER. AFFECTS AUTO SPEED
@@ -55,6 +62,7 @@ static volatile uint8_t flagCatSearchTimeout = FALSE;
 static volatile uint8_t flagAutorun = FALSE;
 static volatile uint8_t recvScheduleMode = FALSE;
 static volatile uint8_t initState = FALSE;
+static volatile uint8_t autoplayStatus = AUTOPLAY_STATUS_BEGIN;
 
 static struct dtaStructQueueU8 patternQueue;
 static uint8_t speed = 0; // 0 ~ 4.
@@ -109,19 +117,20 @@ static void exePattern(int code, int mode) {
 	int32_t cnt = 0;
 	if (mode == PATTERN_EXE_MODE_AUTO) {
 		spdMultiplier = skdSpd;
-		interval = skdDuration / patternQueue.index;
+		if (autoplayStatus == AUTOPLAY_STATUS_BEGIN) { // to avoid hard fault: div by 0. to avoid some logical bugs
+			interval = skdDuration / patternQueue.index;
+			if (!flagAutorun) interval = 1;
 
-		if (!flagAutorun) interval = 1;
-
-		if (spdMultiplier) {
-			rotSpd = AUTO_DEF_ROT_SPD * spdMultiplier;
-			drvSpd = AUTO_DEF_DRV_SPD * spdMultiplier;
+			if (spdMultiplier) {
+				rotSpd = AUTO_DEF_ROT_SPD * spdMultiplier;
+				drvSpd = AUTO_DEF_DRV_SPD * spdMultiplier;
+			}
+			else {
+				rotSpd = AUTO_MIN_ROT_SPD;
+				drvSpd = AUTO_MIN_DRV_SPD;
+			}
+			autoplayStatus = AUTOPLAY_STATUS_DO;
 		}
-		else {
-			rotSpd = AUTO_MIN_ROT_SPD;
-			drvSpd = AUTO_MIN_DRV_SPD;
-		}
-
 		core_call_delayms(300); // give a slight delay between patterns
 	}
 	else if (mode == PATTERN_EXE_MODE_MAN) {
@@ -131,6 +140,18 @@ static void exePattern(int code, int mode) {
 		rotSpd = AUTO_DEF_ROT_SPD * spdMultiplier;
 		drvSpd = AUTO_DEF_DRV_SPD * spdMultiplier;
 	}
+
+#ifdef _AUDIBLE_EXECUTION_ENABLED
+	buzzer_mute();
+	buzzer_setTone(toneA4);
+	buzzer_setDuty(50);
+	for (int audibleExeForCountVar = 0; audibleExeForCountVar < code; audibleExeForCountVar++) {
+		buzzer_unmute();
+		core_call_delayms(250);
+		buzzer_mute();
+		core_call_delayms(250);
+	}
+#endif
 
 	switch (code) {
 	case 1: // Waltz(S-shaped route zig-zaging)
@@ -482,16 +503,24 @@ static void manualDrive() {
 
 static void autoDrive() {
 	//uint8_t rpiPinDta = 0;
-	uint8_t patternCode = 0, patternCodePrev = 0;
-	int snackIntvCnt = 0;
+	uint8_t patternCode, patternCodePrev;
+	int snackIntvCnt;
 	const int* snackIntvVal = &skdSnackIntv;
+
+	autoplayStatus = AUTOPLAY_STATUS_BEGIN;
+	patternCode = 0;
+	patternCodePrev = 0;
+	snackIntvCnt = 0;
 
 	// enable motor
 	l298n_enable();
 	sg90_enable(SG90_MOTOR_A, DEF_ANG_A);
 
 	// skip searching if the schedule was cancelled previously
-	goto lbl_autoDrive_play;
+	if (isAutoplayCancelled) {
+		isAutoplayCancelled = FALSE;
+		goto lbl_autoDrive_play;
+	}
 
 	// set cat searching flag
 	catSearchWaitTime = CAT_SEARCH_WAIT_TIME;
@@ -507,7 +536,7 @@ static void autoDrive() {
 	l298n_setSpeed(L298N_MOTOR_A, AUTO_MIN_ROT_SPD);
 	l298n_setSpeed(L298N_MOTOR_A, AUTO_MIN_ROT_SPD);
 	while (1) {
-		if (rpi_getPinDta() & RPI_PINCODE_I_FOUNDCAT) { // cat is found
+		if (rpi_foundCat()) { // cat is found
 			// do something
 			sndRptIsSet = FALSE;
 			sndRptOutputStat = FALSE;
@@ -538,6 +567,9 @@ static void autoDrive() {
 				if (periph_isVibration() == TRUE) { // detected vibration
 					vibWaitIsSet = FALSE;
 					vibWaitTime = 0;
+					sndRptIsSet = FALSE;
+					sndRptOutputStat = FALSE;
+					buzzer_mute();
 					break;
 				}
 				// check for timeout
@@ -556,9 +588,12 @@ static void autoDrive() {
 					isAutoplayCancelled = TRUE; // mark cancelled
 					l298n_disable(); // disable motors
 					sg90_disable(SG90_MOTOR_A);
+					sndRptIsSet = FALSE;
+					sndRptOutputStat = FALSE;
+					buzzer_mute();
 					return;
 				}
-				core_call_delayms(100);
+				core_call_delayms(25);
 			}
 			break;
 		}
@@ -641,6 +676,7 @@ static void autoDrive() {
 			buzzer_mute();
 			l298n_setRotation(L298N_MOTOR_A, L298N_STOP);
 			l298n_setRotation(L298N_MOTOR_B, L298N_STOP);
+			core_call_delayms(1000);
 		}
 	}
 
@@ -661,6 +697,7 @@ static void autoDrive() {
 		if (periph_irSnsrChk(IR_SNSR_MODE_OP) == IR_SNSR_NEAR || parkPeriodCnt >= 150) {
 			l298n_setRotation(L298N_MOTOR_A, L298N_STOP);
 			l298n_setRotation(L298N_MOTOR_B, L298N_STOP);
+			break;
 		}
 		core_call_delayms(100);
 		parkPeriodCnt++;
@@ -668,6 +705,16 @@ static void autoDrive() {
 
 	// after parking, turn off motor
 	l298n_disable();
+	autoplayStatus = AUTOPLAY_STATUS_END;
+	buzzer_setTone(toneE6);
+	buzzer_setDuty(50);
+	buzzer_unmute();
+	core_call_delayms(250);
+	buzzer_setTone(toneG6);
+	core_call_delayms(250);
+	buzzer_setTone(toneC7);
+	core_call_delayms(250);
+	buzzer_mute();
 }
 
 /* main */
@@ -697,12 +744,13 @@ static void appMain() {
 				case TYPE_SCHEDULE_TIME:
 					if (!recvScheduleMode) break;
 					skdWaitTime = atoi32(rpidta.container);
-					skdIsSet = TRUE;
 					break;
 				case TYPE_SCHEDULE_PATTERN:
 					if (!recvScheduleMode) break;
 					for (int i = 0; i < 7; i++) {
-						if (rpidta.container[i]) core_dtaStruct_enqueueU8(&patternQueue, rpidta.container[i] - 0x30);
+						if (rpidta.container[i]) {
+							if (rpidta.container[i] != '.') core_dtaStruct_enqueueU8(&patternQueue, rpidta.container[i] - 0x30);
+						}
 						else break;
 					}
 					break;
@@ -735,9 +783,30 @@ static void appMain() {
 				case TYPE_SCHEDULE_START:
 					recvScheduleMode = TRUE;
 					isAutoplayCancelled = FALSE; // reset autoplay cancel status to FALSE, since new schedule is being input.
+#ifdef _AUDIBLE_EXECUTION_ENABLED
+					buzzer_mute();
+					buzzer_setTone(toneE6);
+					buzzer_setDuty(50);
+					buzzer_unmute();
+					core_call_delayms(250);
+					buzzer_mute();
+					core_call_delayms(250);
+#endif
 					break;
 				case TYPE_SCHEDULE_END:
 					recvScheduleMode = FALSE;
+#ifdef _AUDIBLE_EXECUTION_ENABLED
+					buzzer_mute();
+					buzzer_setTone(toneE6);
+					buzzer_setDuty(50);
+					for (int audibleExeForCountVar = 0; audibleExeForCountVar < 3; audibleExeForCountVar++) {
+						buzzer_unmute();
+						core_call_delayms(200);
+						buzzer_mute();
+						core_call_delayms(200);
+					}
+#endif
+					skdIsSet = TRUE;
 				}
 			}
 		}
@@ -750,12 +819,36 @@ static void appMain() {
 			flagSkdTimeElapsed = FALSE; // reset flag first
 			skdIsSet = FALSE;
 			flagAutorun = TRUE;
+
+			for (int i = 0; i < 2; i++) {
+				buzzer_setTone(toneC6);
+				buzzer_setDuty(50);
+				buzzer_unmute();
+				core_call_delayms(500);
+				buzzer_setTone(toneE6);
+				core_call_delayms(500);
+				buzzer_setTone(toneG6);
+				core_call_delayms(2000);
+			}
+
+			buzzer_mute();
 			autoDrive();
 			flagAutorun = FALSE;
 		}
 		// check if autoplay is cancelled
 		if (isAutoplayCancelled) {
 			// re-run autoplay if vibration
+#ifdef _AUDIBLE_EXECUTION_ENABLED
+			buzzer_mute();
+			buzzer_setTone(toneA4);
+			buzzer_setDuty(50);
+			for (int audibleExeForCountVar = 0; audibleExeForCountVar < 5; audibleExeForCountVar++) {
+				buzzer_unmute();
+				core_call_delayms(500);
+				buzzer_mute();
+				core_call_delayms(500);
+			}
+#endif
 			if (periph_isVibration()) {
 				autoDrive();
 			}
@@ -841,12 +934,35 @@ void app_start() {
 	skdIsSet = FALSE;
 	initState = TRUE;
 
+	for (int i = 0; i < 20; i++) { // call ir sensor func and rpi pin recv 20 times to avoid error
+		rpi_foundCat();
+		periph_isVibration();
+		core_call_delayms(20);
+	}
+
 	core_call_delayms(300);
 	buzzer_setTone(toneA5); // notify boot success
 	buzzer_setDuty(50);
 	buzzer_unmute();
 	core_call_delayms(250);
 	buzzer_mute();
+
+	/*
+	// for motor driver test only
+	l298n_enable();
+	while(1) {
+		if (periph_isVibration() == FALSE) {
+			l298n_setRotation(L298N_MOTOR_A, L298N_CW);
+			l298n_setRotation(L298N_MOTOR_B, L298N_CCW);
+			l298n_setSpeed(L298N_MOTOR_A, 90);
+			l298n_setSpeed(L298N_MOTOR_B, 90);
+			core_call_delayms(2000);
+		}
+		l298n_setRotation(L298N_MOTOR_A, L298N_STOP);
+		l298n_setRotation(L298N_MOTOR_B, L298N_STOP);
+	}
+	l298n_disable();
+	*/
 
 	appMain();
 }
