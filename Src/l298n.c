@@ -39,10 +39,10 @@ void l298n_init() {
 	spd16b = 0;
 
 	// init GPIO
-	HAL_GPIO_WritePin(L298N_IN_PORT, L298N_IN_1, GPIO_PIN_RESET);
-	HAL_GPIO_WritePin(L298N_IN_PORT, L298N_IN_2, GPIO_PIN_RESET);
-	HAL_GPIO_WritePin(L298N_IN_PORT, L298N_IN_3, GPIO_PIN_RESET);
-	HAL_GPIO_WritePin(L298N_IN_PORT, L298N_IN_4, GPIO_PIN_RESET);
+	HAL_GPIO_WritePin(L298N_IN_PORT_A, L298N_IN_1, GPIO_PIN_RESET);
+	HAL_GPIO_WritePin(L298N_IN_PORT_A, L298N_IN_2, GPIO_PIN_RESET);
+	HAL_GPIO_WritePin(L298N_IN_PORT_B, L298N_IN_3, GPIO_PIN_RESET);
+	HAL_GPIO_WritePin(L298N_IN_PORT_B, L298N_IN_4, GPIO_PIN_RESET);
 
 	// start timer
 	if (timEna == FALSE) {
@@ -80,7 +80,7 @@ void l298n_setSpeed(uint8_t motorNum, uint8_t spd) { // speed scale: 0(stop) to 
 	if (motorNum > L298N_MOTOR_B) return;
 	if (spd > 100) return; // limit max inp val to 100
 
-	else if (motorNum == L298N_MOTOR_A) {
+	if (motorNum == L298N_MOTOR_A) {
 		L298Nstat.spdA = spd;
 		spd16a = (uint16_t)(spd * spdMultr);
 		pTimInstance->CCR1 = (uint32_t)spd16a;
@@ -100,18 +100,18 @@ void l298n_setRotation(uint8_t motorNum, uint8_t dir) { // implies setSpeed(moto
 	if (motorNum == L298N_MOTOR_A) {
 		switch (dir) {
 		case L298N_STOP:
-			HAL_GPIO_WritePin(L298N_IN_PORT, L298N_IN_1, GPIO_PIN_RESET);
-			HAL_GPIO_WritePin(L298N_IN_PORT, L298N_IN_2, GPIO_PIN_RESET);
+			HAL_GPIO_WritePin(L298N_IN_PORT_A, L298N_IN_1, GPIO_PIN_RESET);
+			HAL_GPIO_WritePin(L298N_IN_PORT_A, L298N_IN_2, GPIO_PIN_RESET);
 			L298Nstat.rotA = L298N_STOP;
 			break;
 		case L298N_CW:
-			HAL_GPIO_WritePin(L298N_IN_PORT, L298N_IN_1, GPIO_PIN_SET);
-			HAL_GPIO_WritePin(L298N_IN_PORT, L298N_IN_2, GPIO_PIN_RESET);
+			HAL_GPIO_WritePin(L298N_IN_PORT_A, L298N_IN_1, GPIO_PIN_SET);
+			HAL_GPIO_WritePin(L298N_IN_PORT_A, L298N_IN_2, GPIO_PIN_RESET);
 			L298Nstat.rotA = L298N_CW;
 			break;
 		case L298N_CCW:
-			HAL_GPIO_WritePin(L298N_IN_PORT, L298N_IN_1, GPIO_PIN_RESET);
-			HAL_GPIO_WritePin(L298N_IN_PORT, L298N_IN_2, GPIO_PIN_SET);
+			HAL_GPIO_WritePin(L298N_IN_PORT_A, L298N_IN_1, GPIO_PIN_RESET);
+			HAL_GPIO_WritePin(L298N_IN_PORT_A, L298N_IN_2, GPIO_PIN_SET);
 			L298Nstat.rotA = L298N_CCW;
 			break;
 		}
@@ -119,18 +119,18 @@ void l298n_setRotation(uint8_t motorNum, uint8_t dir) { // implies setSpeed(moto
 	else if (motorNum == L298N_MOTOR_B) {
 		switch (dir) {
 		case L298N_STOP:
-			HAL_GPIO_WritePin(L298N_IN_PORT, L298N_IN_3, GPIO_PIN_RESET);
-			HAL_GPIO_WritePin(L298N_IN_PORT, L298N_IN_4, GPIO_PIN_RESET);
+			HAL_GPIO_WritePin(L298N_IN_PORT_B, L298N_IN_3, GPIO_PIN_RESET);
+			HAL_GPIO_WritePin(L298N_IN_PORT_B, L298N_IN_4, GPIO_PIN_RESET);
 			L298Nstat.rotB = L298N_STOP;
 			break;
 		case L298N_CW:
-			HAL_GPIO_WritePin(L298N_IN_PORT, L298N_IN_3, GPIO_PIN_SET);
-			HAL_GPIO_WritePin(L298N_IN_PORT, L298N_IN_4, GPIO_PIN_RESET);
+			HAL_GPIO_WritePin(L298N_IN_PORT_B, L298N_IN_3, GPIO_PIN_SET);
+			HAL_GPIO_WritePin(L298N_IN_PORT_B, L298N_IN_4, GPIO_PIN_RESET);
 			L298Nstat.rotB = L298N_CW;
 			break;
 		case L298N_CCW:
-			HAL_GPIO_WritePin(L298N_IN_PORT, L298N_IN_3, GPIO_PIN_RESET);
-			HAL_GPIO_WritePin(L298N_IN_PORT, L298N_IN_4, GPIO_PIN_SET);
+			HAL_GPIO_WritePin(L298N_IN_PORT_B, L298N_IN_3, GPIO_PIN_RESET);
+			HAL_GPIO_WritePin(L298N_IN_PORT_B, L298N_IN_4, GPIO_PIN_SET);
 			L298Nstat.rotB = L298N_CCW;
 			break;
 		}
