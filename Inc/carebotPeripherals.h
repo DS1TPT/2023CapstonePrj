@@ -38,7 +38,7 @@
 //#define LED_PIN GPIO_PIN_
 #define IR_SNSR_POLL_TIMEOUT 10
 #define IR_SNSR_TRIG_DIST_OP 20.0
-#define IR_SNSR_TRIG_DIST_FIND 40.0
+#define IR_SNSR_TRIG_DIST_FIND 60.0
 #define IR_SNSR_TRIG_DIST_SNACK 15.0
 
 /* exported struct */
