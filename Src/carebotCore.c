@@ -16,6 +16,7 @@
 #include "carebotPeripherals.h"
 #include "rpicomm.h"
 #include "l298n.h"
+#include "buzzer.h"
 #include "sg90.h"
 
 #if defined _TEST_MODE_SEND_VIA_STLINK_SWO
@@ -36,6 +37,7 @@ static _Bool secTimEna = FALSE;
 static uint8_t pendedOpcodeMem = 0; // bit-masked
 static core_statRetTypeDef (*arrRegdPendingOpHandlerFunc[8])();
 static core_statRetTypeDef (*arrRegdSecTimIntrHandlerFunc[8])();
+static core_statRetTypeDef (*arrRegdUartIntrHandlerFunc[8])(UART_HandleTypeDef*);
 static volatile uint16_t timeMem[8] = { 0, };
 static _Bool timEna = FALSE;
 
@@ -75,9 +77,6 @@ void core_dtaStruct_queueU8init(struct dtaStructQueueU8 *structQueue) {
 
 core_statRetTypeDef core_dtaStruct_enqueueU8(struct dtaStructQueueU8 *structQueue, uint8_t data) {
 	if (structQueue->index == DTA_STRUCT_QUEUE_SIZE - 1) return ERR;
-	for (int i = 0; i < structQueue->index; i++) {
-		structQueue->queue[i + 1] = structQueue->queue[i];
-	}
 	structQueue->queue[++(structQueue->index)] = data;
 	return OK;
 }
@@ -327,10 +326,30 @@ static void millisecTimCallbackHandler() {
 	}
 }
 
+core_statRetTypeDef core_call_uartHandlerRegister(core_statRetTypeDef(*pHandlerFunc)(UART_HandleTypeDef *huart)) {
+	for (int i = 0; i < 8; i++) {
+		if (arrRegdUartIntrHandlerFunc[i] == pHandlerFunc) return ERR; // function already registered
+		else if (arrRegdUartIntrHandlerFunc[i] == NULL) {
+			arrRegdUartIntrHandlerFunc[i] = pHandlerFunc;
+			return OK;
+		}
+	}
+	return ERR; // array is full
+}
+
+core_statRetTypeDef core_call_uartHandlerUnregister(core_statRetTypeDef(*pHandlerFunc)(UART_HandleTypeDef *huart)) {
+	for (int i = 0; i < 8; i++) {
+		if (arrRegdUartIntrHandlerFunc[i] == pHandlerFunc) {
+			arrRegdUartIntrHandlerFunc[i] = NULL;
+			return OK;
+		}
+	}
+	return ERR; // function not found
+}
+
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
-	if (huart->Instance == USART1) {
-		rpi_RxCpltCallbackHandler();
-		//flagRxCplt = TRUE;
+	for (int i = 0; i < 8; i++) {
+		if (arrRegdUartIntrHandlerFunc[i] != NULL) arrRegdUartIntrHandlerFunc[i](huart);
 	}
 }
 
