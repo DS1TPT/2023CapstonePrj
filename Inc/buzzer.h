@@ -130,6 +130,6 @@ void buzzer_setTone(buzzerToneARRvalTypeDef toneCode);
 void buzzer_setFreq(uint16_t freq); // frequency range: 60 <= freq <= 10000
 void buzzer_setDuty(uint8_t dutyRatio); // set Duty ratio. initial value is 50.
 										// duty ratio value is unaffected by other functions except for init.
-										// duty ratio range: 5 < duty < 50
+										// duty ratio range: 5 <= duty <= 50
 
 #endif
