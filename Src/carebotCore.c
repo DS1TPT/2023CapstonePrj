@@ -235,7 +235,7 @@ core_statRetTypeDef core_dbgTx(char *sz) {
 }
 #else
 core_statRetTypeDef core_dbgTx(char *sz) {
-	return ERR;
+	return OK;
 }
 #endif
 
