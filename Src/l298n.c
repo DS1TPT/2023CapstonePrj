@@ -76,18 +76,21 @@ void l298n_disable() { // implies setRotation( , STOP): disable motor operation.
 }
 
 void l298n_setSpeed(uint8_t motorNum, uint8_t spd) { // speed scale: 0(stop) to 100(max.)
+	uint8_t speed;
 	if (L298Nstat.ena == FALSE) return;
 	if (motorNum > L298N_MOTOR_B) return;
-	if (spd > 100) return; // limit max inp val to 100
+	//if (spd > 100) return; // limit max inp val to 100
+	if (spd > 100) speed = 100;
+	else speed = spd;
 
 	if (motorNum == L298N_MOTOR_A) {
-		L298Nstat.spdA = spd;
-		spd16a = (uint16_t)(spd * spdMultr);
+		L298Nstat.spdA = speed;
+		spd16a = (uint16_t)(speed * spdMultr);
 		pTimInstance->CCR1 = (uint32_t)spd16a;
 	}
 	else if (motorNum == L298N_MOTOR_B) {
-		L298Nstat.spdB = spd;
-		spd16b = (uint16_t)(spd * spdMultr);
+		L298Nstat.spdB = speed;
+		spd16b = (uint16_t)(speed * spdMultr);
 		pTimInstance->CCR2 = (uint32_t)spd16b;
 	}
 }
