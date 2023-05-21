@@ -34,25 +34,33 @@ struct SerialDta rpidta;
 #define _AUDIBLE_EXECUTION_ENABLED
 
 // system properties (editable)
-const uint8_t MAN_ROT_SPD = 20; // RANGE: 4~44, EVEN NUMBER. AFFECTS AUTO SPEED
-const uint8_t MAN_DRV_SPD = 40; // RANGE: 4~44, EVEN NUMBER. AFFECTS AUTO SPEED
-const uint8_t SPD_ADDEND = 10; // THIS NUMBER MUST NOT EXCEED: 100 - MANUAL SPEED * 2
-const uint8_t SPD_SUBTRAHEND = 4; // THIS NUMBER MUST BE LESS THAN: MANUAL SPEED / 4
+const uint8_t MAN_ROT_SPD = 44; // RANGE: 30~48, EVEN NUMBER. AFFECTS AUTO SPEED
+const uint8_t MAN_DRV_SPD = 48; // RANGE: 30~48, EVEN NUMBER. AFFECTS AUTO SPEED
+const uint8_t SPD_ADDEND = 3; // THIS NUMBER MUST NOT EXCEED: 100 - MANUAL SPEED * 2
+const uint8_t SPD_SUBTRAHEND = 6; // THIS NUMBER MUST BE LESS THAN: MANUAL SPEED / 4
 const uint8_t DEF_ANG_A = 30; // default angle of snack motor
 //const uint8_t DEF_ANG_B = ; // reserve servo b
-const uint16_t OP_SNACK_RET_MOTOR_WAITING_TIME = 500;
+const uint16_t OP_SNACK_RET_MOTOR_WAITING_TIME = 500; // in milliseconds
 const int32_t CAT_SEARCH_WAIT_TIME = 20; // in seconds
 const int32_t VIB_WAIT_TIME = 600; // in seconds
 const int32_t PATTERN_WAIT_AND_FLEE_WAIT_TIME = 20; // RANGE: 1 ~ 60, in seconds
 
 // derived properties (NOT EDITABLE)
-const uint8_t AUTO_DEF_ROT_SPD = MAN_ROT_SPD / 2;
-const uint8_t AUTO_DEF_DRV_SPD = MAN_DRV_SPD / 2;
-const uint8_t AUTO_MIN_ROT_SPD = (uint8_t)((float)AUTO_DEF_ROT_SPD / 2.0) - (((float)AUTO_DEF_ROT_SPD / 2.0 > 0) ? 0 : 1);
-const uint8_t AUTO_MIN_DRV_SPD = (uint8_t)((float)AUTO_DEF_DRV_SPD / 2.0) - (((float)AUTO_DEF_ROT_SPD / 2.0 > 0) ? 0 : 1);
-const uint8_t SPD_OVERSHOOT_ADDEND = ((AUTO_DEF_ROT_SPD > AUTO_DEF_DRV_SPD) ? (100 - AUTO_DEF_DRV_SPD * 4) : (100 - AUTO_DEF_ROT_SPD * 4));
+
+const uint8_t AUTO_DEF_ROT_SPD = MAN_ROT_SPD;
+const uint8_t AUTO_DEF_DRV_SPD = MAN_DRV_SPD;
+// auto minimum speed calculation formula below is deprecated since it was not able to run motor;
+//const uint8_t AUTO_MIN_ROT_SPD = (uint8_t)((float)AUTO_DEF_ROT_SPD / 2.0) - (((float)AUTO_DEF_ROT_SPD / 2.0 > 0) ? 0 : 1);
+//const uint8_t AUTO_MIN_DRV_SPD = (uint8_t)((float)AUTO_DEF_DRV_SPD / 2.0) - (((float)AUTO_DEF_ROT_SPD / 2.0 > 0) ? 0 : 1);
+// actual minimum motor speed should be around 25~30 to run
+// therefore, i manually set minimum value, and it won't be affected by user settings.
+const uint8_t AUTO_MIN_ROT_SPD = 30;
+const uint8_t AUTO_MIN_DRV_SPD = 30;
+const uint8_t SPD_OVERSHOOT_ADDEND = ((AUTO_DEF_ROT_SPD >= 50 || AUTO_DEF_DRV_SPD >= 50) ? 0 : (AUTO_DEF_ROT_SPD > AUTO_DEF_DRV_SPD) ? (100 - AUTO_DEF_DRV_SPD * 2) : (100 - AUTO_DEF_ROT_SPD * 2));
+
 const uint8_t SNACK_ANG_RDY = DEF_ANG_A;
 const uint8_t SNACK_ANG_GIVE = DEF_ANG_A + 90;
+
 
 // system variables
 static volatile uint8_t flagSkdTimeElapsed = FALSE;
@@ -64,7 +72,7 @@ static volatile uint8_t initState = FALSE;
 static volatile uint8_t autoplayStatus = AUTOPLAY_STATUS_BEGIN;
 
 static struct dtaStructQueueU8 patternQueue;
-static uint8_t speed = 0; // 0 ~ 4.
+static uint8_t speed = 0; // 0 ~ 2.
 static volatile int32_t skdWaitTime = 0;
 static volatile int32_t vibWaitTime = 0;
 static volatile int32_t catSearchWaitTime = 0;
@@ -533,7 +541,7 @@ static void autoDrive() {
 	l298n_setRotation(L298N_MOTOR_A, L298N_CW); // rotate left slowly, to find cat
 	l298n_setRotation(L298N_MOTOR_B, L298N_CW);
 	l298n_setSpeed(L298N_MOTOR_A, AUTO_MIN_ROT_SPD);
-	l298n_setSpeed(L298N_MOTOR_A, AUTO_MIN_ROT_SPD);
+	l298n_setSpeed(L298N_MOTOR_B, AUTO_MIN_ROT_SPD);
 	while (1) {
 		if (rpi_foundCat()) { // cat is found
 			// do something
@@ -760,6 +768,8 @@ static void appMain() {
 				case TYPE_SCHEDULE_SPEED:
 					if (!recvScheduleMode) break;
 					skdSpd = rpidta.container[0];
+					if (skdSpd < 0) skdSpd = 0;
+					else if (skdSpd > 2) skdSpd = 2;
 					break;
 				case TYPE_SYS:
 #ifdef _TEST_MODE_ENABLED
@@ -906,6 +916,7 @@ void app_start() {
 		}
 #endif
 	}
+
 	uint8_t *pu8 = &opcodePendingOp;
 	core_statRetTypeDef(*phf)() = &app_pendingOpTimeoutHandler;
 #ifdef _TEST_MODE_ENABLED
@@ -947,18 +958,25 @@ void app_start() {
 	buzzer_mute();
 
 	/*
-	// for motor driver test only
+	// for motor speed test
 	l298n_enable();
+	l298n_setRotation(L298N_MOTOR_A, L298N_CW);
+	l298n_setRotation(L298N_MOTOR_B, L298N_CCW);
+	uint8_t spd = 9;
+	uint8_t beep = 1;
 	while(1) {
-		if (periph_isVibration() == FALSE) {
-			l298n_setRotation(L298N_MOTOR_A, L298N_CW);
-			l298n_setRotation(L298N_MOTOR_B, L298N_CCW);
-			l298n_setSpeed(L298N_MOTOR_A, 90);
-			l298n_setSpeed(L298N_MOTOR_B, 90);
-			core_call_delayms(2000);
+		l298n_setSpeed(L298N_MOTOR_A, spd);
+		l298n_setSpeed(L298N_MOTOR_B, spd);
+		for(int i = 0; i < beep; i++) {
+			buzzer_unmute();
+			core_call_delayms(200);
+			buzzer_mute();
 		}
-		l298n_setRotation(L298N_MOTOR_A, L298N_STOP);
-		l298n_setRotation(L298N_MOTOR_B, L298N_STOP);
+		core_call_delayms(2000);
+		if (spd > 90) spd = 9;
+		else spd += 10;
+		if (beep > 8) beep = 1;
+		else beep++;
 	}
 	l298n_disable();
 	*/
