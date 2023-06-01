@@ -34,8 +34,8 @@ struct SerialDta rpidta;
 #define _AUDIBLE_EXECUTION_ENABLED
 
 // system properties (editable)
-const uint8_t MAN_ROT_SPD = 44; // RANGE: 30~48, EVEN NUMBER. AFFECTS AUTO SPEED
-const uint8_t MAN_DRV_SPD = 48; // RANGE: 30~48, EVEN NUMBER. AFFECTS AUTO SPEED
+const uint8_t MAN_ROT_SPD = 44; // RANGE: 38~48, EVEN NUMBER. AFFECTS AUTO SPEED
+const uint8_t MAN_DRV_SPD = 48; // RANGE: 38~48, EVEN NUMBER. AFFECTS AUTO SPEED
 const uint8_t SPD_ADDEND = 3; // THIS NUMBER MUST NOT EXCEED: 100 - MANUAL SPEED * 2
 const uint8_t SPD_SUBTRAHEND = 6; // THIS NUMBER MUST BE LESS THAN: MANUAL SPEED / 4
 const uint8_t DEF_ANG_A = 30; // default angle of snack motor
@@ -52,10 +52,10 @@ const uint8_t AUTO_DEF_DRV_SPD = MAN_DRV_SPD;
 // auto minimum speed calculation formula below is deprecated since it was not able to run motor;
 //const uint8_t AUTO_MIN_ROT_SPD = (uint8_t)((float)AUTO_DEF_ROT_SPD / 2.0) - (((float)AUTO_DEF_ROT_SPD / 2.0 > 0) ? 0 : 1);
 //const uint8_t AUTO_MIN_DRV_SPD = (uint8_t)((float)AUTO_DEF_DRV_SPD / 2.0) - (((float)AUTO_DEF_ROT_SPD / 2.0 > 0) ? 0 : 1);
-// actual minimum motor speed should be around 25~30 to run
+// actual minimum motor speed should be around 35~40 to run
 // therefore, i manually set minimum value, and it won't be affected by user settings.
-const uint8_t AUTO_MIN_ROT_SPD = 30;
-const uint8_t AUTO_MIN_DRV_SPD = 30;
+const uint8_t AUTO_MIN_ROT_SPD = 38;
+const uint8_t AUTO_MIN_DRV_SPD = 38;
 const uint8_t SPD_OVERSHOOT_ADDEND = ((AUTO_DEF_ROT_SPD >= 50 || AUTO_DEF_DRV_SPD >= 50) ? 0 : (AUTO_DEF_ROT_SPD > AUTO_DEF_DRV_SPD) ? (100 - AUTO_DEF_DRV_SPD * 2) : (100 - AUTO_DEF_ROT_SPD * 2));
 
 const uint8_t SNACK_ANG_RDY = DEF_ANG_A;
@@ -73,6 +73,8 @@ static volatile uint8_t autoplayStatus = AUTOPLAY_STATUS_BEGIN;
 
 static struct dtaStructQueueU8 patternQueue;
 static uint8_t speed = 0; // 0 ~ 2.
+static uint8_t rotSpd = AUTO_DEF_ROT_SPD * 2;
+static uint8_t drvSpd = AUTO_DEF_DRV_SPD * 2;
 static volatile int32_t skdWaitTime = 0;
 static volatile int32_t vibWaitTime = 0;
 static volatile int32_t catSearchWaitTime = 0;
@@ -116,36 +118,23 @@ static void exePattern(int code, int mode) {
 #ifdef _TEST_MODE_ENABLED
 	core_dbgTx("BEGIN PATTERN ");
 #endif
-	uint8_t spdMultiplier = 0;
-	uint8_t rotSpd, drvSpd;
 	int32_t interval = 0; // seconds
 	int32_t rptNum = 1;
 	int32_t rptTime = 1;
 	int32_t cnt = 0;
 	if (mode == PATTERN_EXE_MODE_AUTO) {
-		spdMultiplier = skdSpd;
 		if (autoplayStatus == AUTOPLAY_STATUS_BEGIN) { // to avoid hard fault: div by 0. to avoid some logical bugs
 			interval = skdDuration / patternQueue.index;
 			if (!flagAutorun) interval = 1;
-
-			if (spdMultiplier) {
-				rotSpd = AUTO_DEF_ROT_SPD * spdMultiplier;
-				drvSpd = AUTO_DEF_DRV_SPD * spdMultiplier;
-			}
-			else {
-				rotSpd = AUTO_MIN_ROT_SPD;
-				drvSpd = AUTO_MIN_DRV_SPD;
-			}
 			autoplayStatus = AUTOPLAY_STATUS_DO;
 		}
 		core_call_delayms(300); // give a slight delay between patterns
 	}
 	else if (mode == PATTERN_EXE_MODE_MAN) {
-		spdMultiplier = 2;
+		rotSpd = AUTO_DEF_ROT_SPD * 2;
+		drvSpd = AUTO_DEF_DRV_SPD * 2;
 		interval = 1;
 		cnt = 0;
-		rotSpd = AUTO_DEF_ROT_SPD * spdMultiplier;
-		drvSpd = AUTO_DEF_DRV_SPD * spdMultiplier;
 	}
 
 #ifdef _AUDIBLE_EXECUTION_ENABLED
@@ -226,23 +215,25 @@ static void exePattern(int code, int mode) {
 		for (int32_t i32 = 0; i32 < rptNum; i32++) {
 			for (int i = 0; i < 5; i++) {
 				l298n_setRotation(L298N_MOTOR_A, L298N_CCW);
-				l298n_setRotation(L298N_MOTOR_B, L298N_STOP);
-				l298n_setSpeed(L298N_MOTOR_A, rotSpd);
-				core_call_delayms(500);
-				l298n_setRotation(L298N_MOTOR_A, L298N_STOP);
 				l298n_setRotation(L298N_MOTOR_B, L298N_CW);
-				l298n_setSpeed(L298N_MOTOR_B, rotSpd);
-				core_call_delayms(500);
+				l298n_setSpeed(L298N_MOTOR_A, drvSpd);
+				l298n_setSpeed(L298N_MOTOR_B, AUTO_MIN_ROT_SPD);
+				core_call_delayms(1000);
+				l298n_setRotation(L298N_MOTOR_A, L298N_CCW);
+				l298n_setRotation(L298N_MOTOR_B, L298N_CW);
+				l298n_setSpeed(L298N_MOTOR_A, AUTO_MIN_ROT_SPD);
+				l298n_setSpeed(L298N_MOTOR_B, drvSpd);
+				core_call_delayms(1000);
 			}
 			for (int i = 0; i < 5; i++) {
 				l298n_setRotation(L298N_MOTOR_A, L298N_CW);
 				l298n_setRotation(L298N_MOTOR_B, L298N_STOP);
 				l298n_setSpeed(L298N_MOTOR_A, rotSpd);
-				core_call_delayms(500);
+				core_call_delayms(1000);
 				l298n_setRotation(L298N_MOTOR_A, L298N_STOP);
 				l298n_setRotation(L298N_MOTOR_B, L298N_CCW);
 				l298n_setSpeed(L298N_MOTOR_B, rotSpd);
-				core_call_delayms(500);
+				core_call_delayms(1000);
 			}
 		}
 		break;
@@ -252,7 +243,7 @@ static void exePattern(int code, int mode) {
 		l298n_setRotation(L298N_MOTOR_A, L298N_CCW); // right
 		l298n_setRotation(L298N_MOTOR_B, L298N_CCW);
 		l298n_setSpeed(L298N_MOTOR_A, drvSpd + SPD_ADDEND);
-		l298n_setSpeed(L298N_MOTOR_B, drvSpd - SPD_SUBTRAHEND);
+		l298n_setSpeed(L298N_MOTOR_B, rotSpd);
 		core_call_delayms(rptTime * 1000);
 		break;
 	case 5: // shake the toy left and right but doesn't go anywhere
@@ -292,22 +283,22 @@ static void exePattern(int code, int mode) {
 			l298n_setRotation(L298N_MOTOR_B, L298N_CCW);
 			l298n_setSpeed(L298N_MOTOR_A, rotSpd);
 			l298n_setSpeed(L298N_MOTOR_B, rotSpd);
-			core_call_delayms(2000);
+			core_call_delayms(7000);
 			l298n_setRotation(L298N_MOTOR_A, L298N_CCW); // forward
 			l298n_setRotation(L298N_MOTOR_B, L298N_CW);
 			l298n_setSpeed(L298N_MOTOR_A, drvSpd);
 			l298n_setSpeed(L298N_MOTOR_B, drvSpd);
-			core_call_delayms(1000);
+			core_call_delayms(5000);
 			l298n_setRotation(L298N_MOTOR_A, L298N_CW); // left
 			l298n_setRotation(L298N_MOTOR_B, L298N_CW);
 			l298n_setSpeed(L298N_MOTOR_A, rotSpd);
 			l298n_setSpeed(L298N_MOTOR_B, rotSpd);
-			core_call_delayms(2000);
+			core_call_delayms(7000);
 			l298n_setRotation(L298N_MOTOR_A, L298N_CW); // backward
 			l298n_setRotation(L298N_MOTOR_B, L298N_CCW);
 			l298n_setSpeed(L298N_MOTOR_A, drvSpd);
 			l298n_setSpeed(L298N_MOTOR_B, drvSpd);
-			core_call_delayms(1000);
+			core_call_delayms(5000);
 		}
 		break;
 	case 7: // wait until something reaches in front of IR sensor, then flee backwards
@@ -751,6 +742,15 @@ static void appMain() {
 				case TYPE_SCHEDULE_TIME:
 					if (!recvScheduleMode) break;
 					skdWaitTime = atoi32(rpidta.container);
+#ifdef _AUDIBLE_EXECUTION_ENABLED
+					buzzer_mute();
+					buzzer_setTone(toneG6);
+					buzzer_setDuty(50);
+					buzzer_unmute();
+					core_call_delayms(250);
+					buzzer_mute();
+					core_call_delayms(250);
+#endif
 					break;
 				case TYPE_SCHEDULE_PATTERN:
 					if (!recvScheduleMode) break;
@@ -760,16 +760,53 @@ static void appMain() {
 						}
 						else break;
 					}
+#ifdef _AUDIBLE_EXECUTION_ENABLED
+					buzzer_mute();
+					buzzer_setTone(toneA6);
+					buzzer_setDuty(50);
+					buzzer_unmute();
+					core_call_delayms(250);
+					buzzer_mute();
+					core_call_delayms(250);
+#endif
 					break;
 				case TYPE_SCHEDULE_SNACK_INTERVAL:
 					if (!recvScheduleMode) break;
 					skdSnackIntv = rpidta.container[0];
+#ifdef _AUDIBLE_EXECUTION_ENABLED
+					buzzer_mute();
+					buzzer_setTone(toneB6);
+					buzzer_setDuty(50);
+					buzzer_unmute();
+					core_call_delayms(250);
+					buzzer_mute();
+					core_call_delayms(250);
+#endif
 					break;
 				case TYPE_SCHEDULE_SPEED:
 					if (!recvScheduleMode) break;
 					skdSpd = rpidta.container[0];
 					if (skdSpd < 0) skdSpd = 0;
 					else if (skdSpd > 2) skdSpd = 2;
+
+					if (skdSpd) {
+						rotSpd = AUTO_DEF_ROT_SPD * skdSpd;
+						drvSpd = AUTO_DEF_DRV_SPD * skdSpd;
+					}
+					else {
+						rotSpd = AUTO_MIN_ROT_SPD;
+						drvSpd = AUTO_MIN_DRV_SPD;
+					}
+
+#ifdef _AUDIBLE_EXECUTION_ENABLED
+					buzzer_mute();
+					buzzer_setTone(toneC7);
+					buzzer_setDuty(50);
+					buzzer_unmute();
+					core_call_delayms(250);
+					buzzer_mute();
+					core_call_delayms(250);
+#endif
 					break;
 				case TYPE_SYS:
 #ifdef _TEST_MODE_ENABLED
@@ -790,6 +827,8 @@ static void appMain() {
 					skdDuration = atoi32(rpidta.container);
 					break;
 				case TYPE_SCHEDULE_START:
+					skdDuration = 1; // if no input, play only once
+
 					recvScheduleMode = TRUE;
 					isAutoplayCancelled = FALSE; // reset autoplay cancel status to FALSE, since new schedule is being input.
 #ifdef _AUDIBLE_EXECUTION_ENABLED
