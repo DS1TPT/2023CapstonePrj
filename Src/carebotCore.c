@@ -86,7 +86,10 @@ core_statRetTypeDef core_dtaStruct_dequeueU8(struct dtaStructQueueU8 *structQueu
 		*pDest = 0;
 		return ERR;
 	}
-	*pDest = structQueue->queue[structQueue->index];
+	*pDest = structQueue->queue[0];
+	for (unsigned u = 0; u < structQueue->index; u++) {
+		structQueue->queue[u] = structQueue->queue[u + 1];
+	}
 	structQueue->queue[structQueue->index--] = 0;
 	return OK;
 }
