@@ -43,10 +43,12 @@ _Bool periph_isVibration() {
 }
 
 int periph_irSnsrChk(int mode) {
+	HAL_ADC_Start(pAdcHandle);
 	halStat = HAL_ADC_PollForConversion(pAdcHandle, IR_SNSR_POLL_TIMEOUT);
-	if (halStat != HAL_OK) // couldn't poll
-		return IR_SNSR_ERR;
+	//if (halStat != HAL_OK) // couldn't poll
+	//	return IR_SNSR_ERR;
 	adcDta = HAL_ADC_GetValue(pAdcHandle); // get data
+	HAL_ADC_Stop(pAdcHandle);
 	/* equation for GP2Y0A02 (y: voltage, x = cm)
 	 * y = 32.467x^-0.8504
 	 * x = 59.88676548 / (y^1.17591721)
