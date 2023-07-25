@@ -22,6 +22,7 @@ static uint8_t rxBuf[DTA_LEN + 1] = { 0, };
 //static uint8_t txBuf[8] = { 0, };
 
 static uint8_t opcode = 0;
+static _Bool isCatFound = FALSE;
 
 void rpi_setHandle(UART_HandleTypeDef* ph) {
 	pUartHandle = ph;
@@ -37,7 +38,10 @@ int rpi_getSerialDta(struct SerialDta* pDest) {
 }
 
 _Bool rpi_foundCat() {
-	if (HAL_GPIO_ReadPin(RPI_PIN_IN_PORT, RPI_PIN_IN_FOUNDCAT) == GPIO_PIN_SET) return TRUE;
+	if (isCatFound == TRUE) {
+		isCatFound = FALSE; // clear flag
+		return TRUE;
+	}
 	else return FALSE;
 
 }
@@ -59,6 +63,7 @@ int rpi_tcpipRespond(uint8_t isErr) { // send RESP pkt to client app. returns OK
 */
 
 void rpi_sendPin(int code) {
+	return; // function disabled since failure happened too much
 	core_call_pendingOpCancel(opcode);
 	switch (code) {
 	case RPI_PINCODE_O_SCHEDULE_EXE:
@@ -86,11 +91,18 @@ core_statRetTypeDef rpi_pendingOpTimeoutHandler() {
 static core_statRetTypeDef rpi_RxCpltCallbackHandler(UART_HandleTypeDef *huart) {
 	//if (huart->Instance != pUartHandle->Instance) return ERR;
 	//if (huart->Instance != USART2) return ERR;
-	UARTdta.available = 1; // mark available
-	UARTdta.type = rxBuf[0]; // copy data from buffer to internal var
-	for (int i = 0; i < DTA_LEN - 1; i++)
-		UARTdta.container[i] = rxBuf[i + 1];
-	UARTdta.container[7] = 0;
+
+	// check if found cat message
+	if (rxBuf[0] == 'I' && rxBuf[1] == '1') {
+		isCatFound = TRUE; // doesn't copy data from buffer; set flag only
+	}
+	else {
+		UARTdta.available = 1; // mark data is available
+		UARTdta.type = rxBuf[0]; // copy data from buffer to internal var
+		for (int i = 0; i < DTA_LEN - 1; i++)
+			UARTdta.container[i] = rxBuf[i + 1];
+		UARTdta.container[7] = 0;
+	}
 	for (int i = 0; i < DTA_LEN + 1; i++) // clr buf
 		rxBuf[i] = 0;
 	HAL_UART_Receive_IT(pUartHandle, rxBuf, DTA_LEN); // restart rx
