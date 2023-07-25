@@ -533,6 +533,7 @@ static void autoDrive() {
 	l298n_setRotation(L298N_MOTOR_B, L298N_CW);
 	l298n_setSpeed(L298N_MOTOR_A, AUTO_MIN_ROT_SPD);
 	l298n_setSpeed(L298N_MOTOR_B, AUTO_MIN_ROT_SPD);
+	rpi_foundCat(); // clears age-old flag
 	while (1) {
 		if (rpi_foundCat()) { // cat is found
 			// do something
@@ -659,19 +660,25 @@ static void autoDrive() {
 		else {
 			exePattern(patternCode, PATTERN_EXE_MODE_AUTO);
 		}
-		if (++snackIntvCnt == *snackIntvVal) { // give snack
+		if (++snackIntvCnt >= *snackIntvVal) { // give snack
 			snackIntvCnt = 0;
 			buzzer_setTone(toneFS6);
 			buzzer_setDuty(50);
 			buzzer_unmute();
+			core_call_delayms(400);
+			buzzer_mute();
+			l298n_setRotation(L298N_MOTOR_A, L298N_CCW); // forwards to create inertia
+			l298n_setRotation(L298N_MOTOR_B, L298N_CW);
+			l298n_setSpeed(L298N_MOTOR_A, L298N_MAX_SPD);
+			l298n_setSpeed(L298N_MOTOR_B, L298N_MAX_SPD);
+			core_call_delayms(400);
 			sg90_setAngle(SG90_MOTOR_A, SNACK_ANG_GIVE);
 			core_call_pendingOpAdd(opcodePendingOp, OP_SNACK_RET_MOTOR_WAITING_TIME);
 			l298n_setRotation(L298N_MOTOR_A, L298N_CW); // backwards, fast speed to use inertia of snack
 			l298n_setRotation(L298N_MOTOR_B, L298N_CCW);
 			l298n_setSpeed(L298N_MOTOR_A, L298N_MAX_SPD);
 			l298n_setSpeed(L298N_MOTOR_B, L298N_MAX_SPD);
-			core_call_delayms(400);
-			buzzer_mute();
+			core_call_delayms(800);
 			l298n_setRotation(L298N_MOTOR_A, L298N_STOP);
 			l298n_setRotation(L298N_MOTOR_B, L298N_STOP);
 			core_call_delayms(1000);
@@ -997,7 +1004,7 @@ void app_start() {
 	buzzer_mute();
 
 	/*
-	// for motor speed test
+	// motor speed test: PASS
 	l298n_enable();
 	l298n_setRotation(L298N_MOTOR_A, L298N_CW);
 	l298n_setRotation(L298N_MOTOR_B, L298N_CCW);
@@ -1018,6 +1025,63 @@ void app_start() {
 		else beep++;
 	}
 	l298n_disable();
+	*/
+
+	/*
+	// laser test: PASS
+	while (1) {
+		periph_laser_on();
+		core_call_delayms(500);
+		periph_laser_off();
+		core_call_delayms(1500);
+	}
+	*/
+
+	/*
+	// prox snsr test: PASS
+	while (1) {
+		core_call_delayms(1000);
+		if (periph_irSnsrChk(IR_SNSR_MODE_FIND) == IR_SNSR_NEAR) {
+			for (int i = 0; i < 5; i++) {
+				buzzer_unmute();
+				core_call_delayms(200);
+				buzzer_mute();
+			}
+		}
+		if (periph_irSnsrChk(IR_SNSR_MODE_FIND) == IR_SNSR_ERR) {
+			buzzer_unmute();
+			core_call_delayms(5000);
+			buzzer_mute();
+			while (1) {
+
+			}
+		}
+	}
+	*/
+
+	// pin comm test: PASS
+	/*
+	while (1) {
+		if (rpi_foundCat() == TRUE) {
+			for (int i = 0; i < 5; i++) {
+				buzzer_unmute();
+				core_call_delayms(200);
+				buzzer_mute();
+				core_call_delayms(200);
+			}
+		}
+	}
+	*/
+
+	/*
+	// servo test: DIDN'T TEST
+	sg90_enable(SG90_MOTOR_A, SNACK_ANG_RDY);
+	while (1) {
+		core_call_delayms(2000);
+		sg90_setAngle(SG90_MOTOR_A, SNACK_ANG_GIVE);
+		core_call_delayms(2000);
+		sg90_setAngle(SG90_MOTOR_A, SNACK_ANG_RDY);
+	}
 	*/
 
 	appMain();
