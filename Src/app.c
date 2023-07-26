@@ -117,32 +117,35 @@ int32_t atoi32(uint8_t* str) {
 static void giveSnack() {
 	buzzer_setTone(toneFS6);
 	buzzer_setDuty(50);
-	buzzer_unmute();
-	core_call_delayms(300);
-	buzzer_mute();
+	for (int i = 0; i < 5; i++) {
+		buzzer_unmute();
+		core_call_delayms(60);
+		buzzer_mute();
+		core_call_delayms(60);
+	}
 	periph_laser_on(); // use laser
 	l298n_setRotation(L298N_MOTOR_A, L298N_CW); // rotate to right
 	l298n_setRotation(L298N_MOTOR_B, L298N_CW);
 	l298n_setSpeed(L298N_MOTOR_A, L298N_MAX_SPD);
 	l298n_setSpeed(L298N_MOTOR_B, L298N_MAX_SPD);
-	core_call_delayms(1500);
+	core_call_delayms(4500);
 	l298n_setRotation(L298N_MOTOR_A, L298N_STOP);
 	l298n_setRotation(L298N_MOTOR_B, L298N_STOP);
 	periph_laser_off();
-	core_call_delayms(200);
+	core_call_delayms(500);
 
 	l298n_setRotation(L298N_MOTOR_A, L298N_CCW); // forwards to create inertia
 	l298n_setRotation(L298N_MOTOR_B, L298N_CW);
 	l298n_setSpeed(L298N_MOTOR_A, L298N_MAX_SPD);
 	l298n_setSpeed(L298N_MOTOR_B, L298N_MAX_SPD);
-	core_call_delayms(400);
+	core_call_delayms(1500);
 	sg90_setAngle(SG90_MOTOR_A, SNACK_ANG_GIVE);
 	core_call_pendingOpAdd(opcodePendingOp, OP_SNACK_RET_MOTOR_WAITING_TIME);
 	l298n_setRotation(L298N_MOTOR_A, L298N_CW); // backwards, fast speed to use inertia of snack
 	l298n_setRotation(L298N_MOTOR_B, L298N_CCW);
 	l298n_setSpeed(L298N_MOTOR_A, L298N_MAX_SPD);
 	l298n_setSpeed(L298N_MOTOR_B, L298N_MAX_SPD);
-	core_call_delayms(800);
+	core_call_delayms(2500);
 	l298n_setRotation(L298N_MOTOR_A, L298N_STOP);
 	l298n_setRotation(L298N_MOTOR_B, L298N_STOP);
 	core_call_delayms(1000);
@@ -642,7 +645,7 @@ static void autoDrive() {
 	// play
 	lbl_autoDrive_play:
 
-	snackIntvCnt = 0;
+	snackIntvCnt = -1;
 	while (1) {
 		// get pattern code and move robot according to dequeued code
 		patternCodePrev = patternCode;
