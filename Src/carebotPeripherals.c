@@ -67,6 +67,10 @@ int periph_irSnsrChk(int mode) {
 		if (distCM <= IR_SNSR_TRIG_DIST_FIND) return IR_SNSR_NEAR;
 		else return IR_SNSR_FAR;
 		break;
+	case IR_SNSR_MODE_LONG:
+		if (distCM <= IR_SNSR_TRIG_DIST_LONG) return IR_SNSR_NEAR;
+		else return IR_SNSR_FAR;
+		break;
 	case IR_SNSR_MODE_SNACK:
 		if (distCM <= IR_SNSR_TRIG_DIST_SNACK) return IR_SNSR_NEAR;
 		else return IR_SNSR_FAR;
