@@ -114,6 +114,40 @@ int32_t atoi32(uint8_t* str) {
 /* schedule related functions */
 
 /* play related functions */
+static void giveSnack() {
+	buzzer_setTone(toneFS6);
+	buzzer_setDuty(50);
+	buzzer_unmute();
+	core_call_delayms(300);
+	buzzer_mute();
+	periph_laser_on(); // use laser
+	l298n_setRotation(L298N_MOTOR_A, L298N_CW); // rotate to right
+	l298n_setRotation(L298N_MOTOR_B, L298N_CW);
+	l298n_setSpeed(L298N_MOTOR_A, L298N_MAX_SPD);
+	l298n_setSpeed(L298N_MOTOR_B, L298N_MAX_SPD);
+	core_call_delayms(1500);
+	l298n_setRotation(L298N_MOTOR_A, L298N_STOP);
+	l298n_setRotation(L298N_MOTOR_B, L298N_STOP);
+	periph_laser_off();
+	core_call_delayms(200);
+
+	l298n_setRotation(L298N_MOTOR_A, L298N_CCW); // forwards to create inertia
+	l298n_setRotation(L298N_MOTOR_B, L298N_CW);
+	l298n_setSpeed(L298N_MOTOR_A, L298N_MAX_SPD);
+	l298n_setSpeed(L298N_MOTOR_B, L298N_MAX_SPD);
+	core_call_delayms(400);
+	sg90_setAngle(SG90_MOTOR_A, SNACK_ANG_GIVE);
+	core_call_pendingOpAdd(opcodePendingOp, OP_SNACK_RET_MOTOR_WAITING_TIME);
+	l298n_setRotation(L298N_MOTOR_A, L298N_CW); // backwards, fast speed to use inertia of snack
+	l298n_setRotation(L298N_MOTOR_B, L298N_CCW);
+	l298n_setSpeed(L298N_MOTOR_A, L298N_MAX_SPD);
+	l298n_setSpeed(L298N_MOTOR_B, L298N_MAX_SPD);
+	core_call_delayms(800);
+	l298n_setRotation(L298N_MOTOR_A, L298N_STOP);
+	l298n_setRotation(L298N_MOTOR_B, L298N_STOP);
+	core_call_delayms(1000);
+}
+
 static void exePattern(int code, int mode) {
 #ifdef _TEST_MODE_ENABLED
 	core_dbgTx("BEGIN PATTERN ");
@@ -139,14 +173,18 @@ static void exePattern(int code, int mode) {
 
 #ifdef _AUDIBLE_EXECUTION_ENABLED
 	buzzer_mute();
-	buzzer_setTone(toneA4);
 	buzzer_setDuty(50);
-	for (int audibleExeForCountVar = 0; audibleExeForCountVar < code; audibleExeForCountVar++) {
-		buzzer_unmute();
-		core_call_delayms(250);
-		buzzer_mute();
-		core_call_delayms(250);
+	buzzer_setTone(toneD4);
+	buzzer_unmute();
+	for (int audibleExeForCountVar = 0; audibleExeForCountVar < 2; audibleExeForCountVar++) {
+		buzzer_setTone(toneD4);
+		core_call_delayms(100);
+		buzzer_setTone(toneDS4);
+		core_call_delayms(100);
+		buzzer_setTone(toneF4);
+		core_call_delayms(100);
 	}
+	buzzer_mute();
 #endif
 
 	switch (code) {
@@ -162,16 +200,16 @@ static void exePattern(int code, int mode) {
 			// forward
 			l298n_setSpeed(L298N_MOTOR_A, drvSpd);
 			l298n_setSpeed(L298N_MOTOR_B, drvSpd);
-			core_call_delayms(300);
+			core_call_delayms(500);
 			l298n_setSpeed(L298N_MOTOR_A, AUTO_MIN_ROT_SPD); // rotation speed will not be affected by speed multiplier
 			l298n_setSpeed(L298N_MOTOR_B, AUTO_DEF_ROT_SPD);
-			core_call_delayms(1000);
+			core_call_delayms(1500);
 			l298n_setSpeed(L298N_MOTOR_A, drvSpd);
 			l298n_setSpeed(L298N_MOTOR_B, drvSpd);
-			core_call_delayms(300);
+			core_call_delayms(500);
 			l298n_setSpeed(L298N_MOTOR_A, AUTO_DEF_ROT_SPD); // rotation speed will not be affected by speed multiplier
 			l298n_setSpeed(L298N_MOTOR_B, AUTO_MIN_ROT_SPD);
-			core_call_delayms(1000);
+			core_call_delayms(1500);
 		}
 		break;
 	case 2: // loop of Sudden accel., decel.
@@ -249,30 +287,30 @@ static void exePattern(int code, int mode) {
 	case 5: // shake the toy left and right but doesn't go anywhere
 		// this pattern will rotate the robot faster than pattern 8
 		rptNum = interval;
-		if (rptNum < 2) rptNum = 1; // execute at least one time
+		if (rptNum < 2) rptNum = 10; // execute at least one time
 		for (int32_t i32 = 0; i32 < rptNum; i32++) {
 			l298n_setRotation(L298N_MOTOR_A, L298N_CCW); // right
 			l298n_setRotation(L298N_MOTOR_B, L298N_CCW);
 			l298n_setSpeed(L298N_MOTOR_A, rotSpd + SPD_OVERSHOOT_ADDEND);
 			l298n_setSpeed(L298N_MOTOR_B, rotSpd + SPD_OVERSHOOT_ADDEND);
-			core_call_delayms(150);
+			core_call_delayms(400);
 			l298n_setSpeed(L298N_MOTOR_A, rotSpd);
 			l298n_setSpeed(L298N_MOTOR_B, rotSpd);
-			core_call_delayms(150);
+			core_call_delayms(600);
 			l298n_setSpeed(L298N_MOTOR_A, 0);
 			l298n_setSpeed(L298N_MOTOR_B, 0);
-			core_call_delayms(100);
+			core_call_delayms(250);
 			l298n_setRotation(L298N_MOTOR_A, L298N_CW); // left
 			l298n_setRotation(L298N_MOTOR_B, L298N_CW);
 			l298n_setSpeed(L298N_MOTOR_A, rotSpd + SPD_OVERSHOOT_ADDEND);
 			l298n_setSpeed(L298N_MOTOR_B, rotSpd + SPD_OVERSHOOT_ADDEND);
-			core_call_delayms(150);
+			core_call_delayms(400);
 			l298n_setSpeed(L298N_MOTOR_A, rotSpd);
 			l298n_setSpeed(L298N_MOTOR_B, rotSpd);
-			core_call_delayms(150);
+			core_call_delayms(600);
 			l298n_setSpeed(L298N_MOTOR_A, 0);
 			l298n_setSpeed(L298N_MOTOR_B, 0);
-			core_call_delayms(100);
+			core_call_delayms(250);
 		}
 		break;
 	case 6: // rotate, go to somewhere else, then rotate again
@@ -330,17 +368,17 @@ static void exePattern(int code, int mode) {
 		break;
 	case 8: // shake the toy left and right, flee to somewhere else, then shake the toy again
 		rptNum = interval / 2;
-		if (rptNum < 2) rptNum = 1; // execute at least one time
+		if (rptNum < 2) rptNum = 2; // execute at least one time
 		for (int32_t i32 = 0; i32 < rptNum; i32++) {
 			for (int i = 0; i < 5; i++) { // shake
 				l298n_setRotation(L298N_MOTOR_A, L298N_CW); // left
 				l298n_setRotation(L298N_MOTOR_B, L298N_CW);
 				l298n_setSpeed(L298N_MOTOR_A, rotSpd + SPD_OVERSHOOT_ADDEND / 2);
 				l298n_setSpeed(L298N_MOTOR_B, rotSpd + SPD_OVERSHOOT_ADDEND / 2);
-				core_call_delayms(150);
+				core_call_delayms(400);
 				l298n_setSpeed(L298N_MOTOR_A, rotSpd);
 				l298n_setSpeed(L298N_MOTOR_B, rotSpd);
-				core_call_delayms(150);
+				core_call_delayms(600);
 				l298n_setSpeed(L298N_MOTOR_A, 0);
 				l298n_setSpeed(L298N_MOTOR_B, 0);
 				core_call_delayms(100);
@@ -348,10 +386,10 @@ static void exePattern(int code, int mode) {
 				l298n_setRotation(L298N_MOTOR_B, L298N_CCW);
 				l298n_setSpeed(L298N_MOTOR_A, rotSpd + SPD_OVERSHOOT_ADDEND / 2);
 				l298n_setSpeed(L298N_MOTOR_B, rotSpd + SPD_OVERSHOOT_ADDEND / 2);
-				core_call_delayms(150);
+				core_call_delayms(400);
 				l298n_setSpeed(L298N_MOTOR_A, rotSpd);
 				l298n_setSpeed(L298N_MOTOR_B, rotSpd);
-				core_call_delayms(150);
+				core_call_delayms(600);
 				l298n_setSpeed(L298N_MOTOR_A, 0);
 				l298n_setSpeed(L298N_MOTOR_B, 0);
 				core_call_delayms(100);
@@ -372,10 +410,10 @@ static void exePattern(int code, int mode) {
 				l298n_setRotation(L298N_MOTOR_B, L298N_CW);
 				l298n_setSpeed(L298N_MOTOR_A, rotSpd + SPD_OVERSHOOT_ADDEND / 2);
 				l298n_setSpeed(L298N_MOTOR_B, rotSpd + SPD_OVERSHOOT_ADDEND / 2);
-				core_call_delayms(150);
+				core_call_delayms(400);
 				l298n_setSpeed(L298N_MOTOR_A, rotSpd);
 				l298n_setSpeed(L298N_MOTOR_B, rotSpd);
-				core_call_delayms(150);
+				core_call_delayms(600);
 				l298n_setSpeed(L298N_MOTOR_A, 0);
 				l298n_setSpeed(L298N_MOTOR_B, 0);
 				core_call_delayms(100);
@@ -383,10 +421,10 @@ static void exePattern(int code, int mode) {
 				l298n_setRotation(L298N_MOTOR_B, L298N_CCW);
 				l298n_setSpeed(L298N_MOTOR_A, rotSpd + SPD_OVERSHOOT_ADDEND / 2);
 				l298n_setSpeed(L298N_MOTOR_B, rotSpd + SPD_OVERSHOOT_ADDEND / 2);
-				core_call_delayms(150);
+				core_call_delayms(400);
 				l298n_setSpeed(L298N_MOTOR_A, rotSpd);
 				l298n_setSpeed(L298N_MOTOR_B, rotSpd);
-				core_call_delayms(150);
+				core_call_delayms(600);
 				l298n_setSpeed(L298N_MOTOR_A, 0);
 				l298n_setSpeed(L298N_MOTOR_B, 0);
 				core_call_delayms(100);
@@ -503,7 +541,7 @@ static void autoDrive() {
 	//uint8_t rpiPinDta = 0;
 	uint8_t patternCode, patternCodePrev;
 	int snackIntvCnt;
-	const int* snackIntvVal = &skdSnackIntv;
+	_Bool foundCatOnce = FALSE;
 
 	autoplayStatus = AUTOPLAY_STATUS_BEGIN;
 	patternCode = 0;
@@ -534,8 +572,11 @@ static void autoDrive() {
 	l298n_setSpeed(L298N_MOTOR_A, AUTO_MIN_ROT_SPD);
 	l298n_setSpeed(L298N_MOTOR_B, AUTO_MIN_ROT_SPD);
 	rpi_foundCat(); // clears age-old flag
+	foundCatOnce = FALSE;
 	while (1) {
-		if (rpi_foundCat()) { // cat is found
+		if (rpi_foundCat() == TRUE) foundCatOnce = TRUE;
+		//if (foundCatOnce && periph_irSnsrChk(IR_SNSR_MODE_LONG) == IR_SNSR_NEAR) { // cat is found, check distance
+		if (foundCatOnce) { // cat is found, no distance check
 			// do something
 			sndRptIsSet = FALSE;
 			sndRptOutputStat = FALSE;
@@ -605,6 +646,10 @@ static void autoDrive() {
 	while (1) {
 		// get pattern code and move robot according to dequeued code
 		patternCodePrev = patternCode;
+		if (++snackIntvCnt >= skdSnackIntv) { // give snack
+			snackIntvCnt = 0;
+			giveSnack();
+		}
 		if (core_dtaStruct_queueU8isEmpty(&patternQueue)) break;
 		if (core_dtaStruct_dequeueU8(&patternQueue, &patternCode) == ERR) break; // empty
 		if (!patternCode) { // Auto-decide
@@ -659,29 +704,6 @@ static void autoDrive() {
 		}
 		else {
 			exePattern(patternCode, PATTERN_EXE_MODE_AUTO);
-		}
-		if (++snackIntvCnt >= *snackIntvVal) { // give snack
-			snackIntvCnt = 0;
-			buzzer_setTone(toneFS6);
-			buzzer_setDuty(50);
-			buzzer_unmute();
-			core_call_delayms(400);
-			buzzer_mute();
-			l298n_setRotation(L298N_MOTOR_A, L298N_CCW); // forwards to create inertia
-			l298n_setRotation(L298N_MOTOR_B, L298N_CW);
-			l298n_setSpeed(L298N_MOTOR_A, L298N_MAX_SPD);
-			l298n_setSpeed(L298N_MOTOR_B, L298N_MAX_SPD);
-			core_call_delayms(400);
-			sg90_setAngle(SG90_MOTOR_A, SNACK_ANG_GIVE);
-			core_call_pendingOpAdd(opcodePendingOp, OP_SNACK_RET_MOTOR_WAITING_TIME);
-			l298n_setRotation(L298N_MOTOR_A, L298N_CW); // backwards, fast speed to use inertia of snack
-			l298n_setRotation(L298N_MOTOR_B, L298N_CCW);
-			l298n_setSpeed(L298N_MOTOR_A, L298N_MAX_SPD);
-			l298n_setSpeed(L298N_MOTOR_B, L298N_MAX_SPD);
-			core_call_delayms(800);
-			l298n_setRotation(L298N_MOTOR_A, L298N_STOP);
-			l298n_setRotation(L298N_MOTOR_B, L298N_STOP);
-			core_call_delayms(1000);
 		}
 	}
 
@@ -779,7 +801,7 @@ static void appMain() {
 					break;
 				case TYPE_SCHEDULE_SNACK_INTERVAL:
 					if (!recvScheduleMode) break;
-					skdSnackIntv = rpidta.container[0];
+					skdSnackIntv = rpidta.container[0] - 0x30;
 #ifdef _AUDIBLE_EXECUTION_ENABLED
 					buzzer_mute();
 					buzzer_setTone(toneB6);
