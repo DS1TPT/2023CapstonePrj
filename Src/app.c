@@ -28,25 +28,31 @@ struct SerialDta rpidta;
 #define AUTOPLAY_STATUS_DO 1
 #define AUTOPLAY_STATUS_END 2
 
+#define SEARCH_SUCCESS 0
+#define SEARCH_TIMEOUT 1
+
 /* TEST MODE can be disabled by commenting some lines at: carebotCore.h */
 
 // for audible execution: (AUTODRIVE MODE AND COMM ONLY) notify what's going on using beep.
 #define _AUDIBLE_EXECUTION_ENABLED
 
+// double manual forward/backward speed
+#define _2X_MAN_DRV_SPD
+
 // system properties (editable)
-const uint8_t MAN_ROT_SPD = 44; // RANGE: 38~48, EVEN NUMBER. AFFECTS AUTO SPEED
-const uint8_t MAN_DRV_SPD = 48; // RANGE: 38~48, EVEN NUMBER. AFFECTS AUTO SPEED
+const uint8_t MAN_ROT_SPD = 44; // RANGE: 38~48, EVEN NUMBER.
+const uint8_t MAN_DRV_SPD = 48; // RANGE: 38~48, EVEN NUMBER.
 const uint8_t SPD_ADDEND = 3; // THIS NUMBER MUST NOT EXCEED: 100 - MANUAL SPEED * 2
 const uint8_t SPD_SUBTRAHEND = 6; // THIS NUMBER MUST BE LESS THAN: MANUAL SPEED / 4
 const uint8_t DEF_ANG_A = 30; // default angle of snack motor
 //const uint8_t DEF_ANG_B = ; // reserve servo b
 const uint16_t OP_SNACK_RET_MOTOR_WAITING_TIME = 500; // in milliseconds
-const int32_t CAT_SEARCH_WAIT_TIME = 20; // in seconds
+const int32_t CAT_SEARCH_INITIAL_WAIT_TIME = 20 * 1000; // in milliseconds
+const int32_t CAT_SEARCH_TOTAL_WAIT_TIME = 5 * 60; // in seconds
 const int32_t VIB_WAIT_TIME = 600; // in seconds
 const int32_t PATTERN_WAIT_AND_FLEE_WAIT_TIME = 20; // RANGE: 1 ~ 60, in seconds
 
-// derived properties (NOT EDITABLE)
-
+// SOME OF PROPERTIES BELOW ARE DERIVED. DERIVED PROPERTIES MUST NOT BE EDITED
 const uint8_t AUTO_DEF_ROT_SPD = MAN_ROT_SPD;
 const uint8_t AUTO_DEF_DRV_SPD = MAN_DRV_SPD;
 // auto minimum speed calculation formula below is deprecated since it was not able to run motor;
@@ -56,6 +62,10 @@ const uint8_t AUTO_DEF_DRV_SPD = MAN_DRV_SPD;
 // therefore, i manually set minimum value, and it won't be affected by user settings.
 const uint8_t AUTO_MIN_ROT_SPD = 38;
 const uint8_t AUTO_MIN_DRV_SPD = 38;
+const uint8_t ROOM_SEARCH_ROT_SPD = AUTO_MIN_ROT_SPD * 2;
+const uint8_t ROOM_SEARCH_DRV_SPD = 95;
+const int32_t ROOM_SEARCH_ROT_TIME_18DEG = 550; // in milliseconds
+//const int32_t ROOM_SEARCH_ROT_TIME_30DEG = 890; // in milliseconds
 const uint8_t SPD_OVERSHOOT_ADDEND = ((AUTO_DEF_ROT_SPD >= 50 || AUTO_DEF_DRV_SPD >= 50) ? 0 : (AUTO_DEF_ROT_SPD > AUTO_DEF_DRV_SPD) ? (100 - AUTO_DEF_DRV_SPD * 2) : (100 - AUTO_DEF_ROT_SPD * 2));
 
 const uint8_t SNACK_ANG_RDY = DEF_ANG_A;
@@ -114,6 +124,231 @@ int32_t atoi32(uint8_t* str) {
 /* schedule related functions */
 
 /* play related functions */
+
+static int searchCat() { // returns SEARCH_SUCCESS or SEARCH_TIMEOUT
+	//float arrDist30[12] = { 0.0, };
+	float arrDist18[20] = { 0.0, };
+	float longestDist = 0.0;
+	int longestCnt = 0;
+	int32_t msElapsedCnt = 0;
+
+	// set cat searching flag
+	catSearchWaitTime = CAT_SEARCH_TOTAL_WAIT_TIME;
+	catSearchIsSet = TRUE;
+	flagCatSearchTimeout = FALSE;
+
+	// init
+	rpi_sendPin(RPI_PINCODE_O_SCHEDULE_EXE);
+	core_call_delayms(1000);
+	for (int i = 0; i < 20; i++) {
+		arrDist18[i] = 0.0;
+	}
+	longestDist = 0.0;
+	longestCnt = 0;
+	msElapsedCnt = 0;
+
+	l298n_setRotation(L298N_MOTOR_A, L298N_CW); // rotate left slowly to find obstacles
+	l298n_setRotation(L298N_MOTOR_B, L298N_CW);
+	l298n_setSpeed(L298N_MOTOR_A, AUTO_MIN_ROT_SPD);
+	l298n_setSpeed(L298N_MOTOR_B, AUTO_MIN_ROT_SPD);
+	rpi_foundCat(); // clears age-old flag
+
+	// stage: initial search
+
+	while (1) {
+		if (rpi_foundCat() == TRUE) {
+			l298n_setRotation(L298N_MOTOR_A, L298N_STOP);
+			l298n_setRotation(L298N_MOTOR_B, L298N_STOP);
+			core_call_delayms(200);
+			l298n_setRotation(L298N_MOTOR_A, L298N_CCW); // rotate CW slowly for 800ms to correct delay
+			l298n_setRotation(L298N_MOTOR_B, L298N_CCW);
+			l298n_setSpeed(L298N_MOTOR_A, AUTO_MIN_ROT_SPD);
+			l298n_setSpeed(L298N_MOTOR_B, AUTO_MIN_ROT_SPD);
+			core_call_delayms(800);
+			l298n_setRotation(L298N_MOTOR_A, L298N_STOP);
+			l298n_setRotation(L298N_MOTOR_B, L298N_STOP);
+			goto lbl_found;
+		}
+		core_call_delayms(100);
+		msElapsedCnt += 100;
+		if (msElapsedCnt >= CAT_SEARCH_INITIAL_WAIT_TIME) { // initial search timeout
+			l298n_setRotation(L298N_MOTOR_A, L298N_STOP);
+			l298n_setRotation(L298N_MOTOR_B, L298N_STOP);
+			buzzer_setTone(toneF6);
+			buzzer_setDuty(10);
+			buzzer_unmute();
+			core_call_delayms(150);
+			buzzer_mute();
+			core_call_delayms(150);
+			break;
+		}
+	}
+
+	// stage: search room
+
+	l298n_setRotation(L298N_MOTOR_A, L298N_STOP);
+	l298n_setRotation(L298N_MOTOR_B, L298N_STOP);
+
+	while (1) {
+		// rotate 18 deg 20 times to find angle, rotate CW
+		for (int i = 0; i < 20; i++) {
+			l298n_setRotation(L298N_MOTOR_A, L298N_CCW);
+			l298n_setRotation(L298N_MOTOR_B, L298N_CCW);
+
+			l298n_setSpeed(L298N_MOTOR_A, ROOM_SEARCH_ROT_SPD);
+			l298n_setSpeed(L298N_MOTOR_B, ROOM_SEARCH_ROT_SPD);
+
+			core_call_delayms(ROOM_SEARCH_ROT_TIME_18DEG);
+
+			l298n_setRotation(L298N_MOTOR_A, L298N_STOP);
+			l298n_setRotation(L298N_MOTOR_B, L298N_STOP);
+			core_call_delayms(50);
+
+			// check cat and timeout
+			if (rpi_foundCat() == TRUE) goto lbl_found;
+			if (flagCatSearchTimeout) { // couldn't find cat, start wait-calling mode
+				goto lbl_timeoutWait;
+			}
+
+			arrDist18[i] = periph_irSnsrRaw();
+			if (arrDist18[i] >= 100.0) break; // found very long dist
+			if (i > 2) {
+				if (arrDist18[i-1] > arrDist18[i] && arrDist18[i-1] > arrDist18[i-2] && arrDist18[i-1] > 65.0) {
+					// found a direction that is possibly open
+					l298n_setRotation(L298N_MOTOR_A, L298N_CW); // return to prev angle
+					l298n_setRotation(L298N_MOTOR_B, L298N_CW);
+					l298n_setSpeed(L298N_MOTOR_A, ROOM_SEARCH_ROT_SPD);
+					l298n_setSpeed(L298N_MOTOR_B, ROOM_SEARCH_ROT_SPD);
+					core_call_delayms(ROOM_SEARCH_ROT_TIME_18DEG);
+					l298n_setRotation(L298N_MOTOR_A, L298N_STOP);
+					l298n_setRotation(L298N_MOTOR_B, L298N_STOP);
+					core_call_delayms(50);
+					// check cat and timeout
+					if (rpi_foundCat() == TRUE) goto lbl_found;
+					if (flagCatSearchTimeout) { // couldn't find cat, start wait-calling mode
+						goto lbl_timeoutWait;
+					}
+					break;
+				}
+			}
+			if (i == 19) { // rotation finished
+				// find longest distance
+				longestDist = arrDist18[0];
+				longestCnt = 0;
+				for (int j = 1; j < 20; j++) {
+					if (longestDist < arrDist18[j]) {
+						longestDist = arrDist18[j];
+						longestCnt = j;
+					}
+				}
+				// head to best direction
+				l298n_setRotation(L298N_MOTOR_A, L298N_CW); // return to prev angle
+				l298n_setRotation(L298N_MOTOR_B, L298N_CW);
+				l298n_setSpeed(L298N_MOTOR_A, ROOM_SEARCH_ROT_SPD);
+				l298n_setSpeed(L298N_MOTOR_B, ROOM_SEARCH_ROT_SPD);
+				core_call_delayms(ROOM_SEARCH_ROT_TIME_18DEG * (19 - longestDist));
+				l298n_setRotation(L298N_MOTOR_A, L298N_STOP);
+				l298n_setRotation(L298N_MOTOR_B, L298N_STOP);
+				core_call_delayms(50);
+			}
+		}
+
+		// check cat and timeout
+		if (rpi_foundCat() == TRUE) goto lbl_found;
+		if (flagCatSearchTimeout) { // couldn't find cat, start wait-calling mode
+			goto lbl_timeoutWait;
+		}
+
+		// go forward until obstacle detection(trig: 35cm)
+		l298n_setRotation(L298N_MOTOR_A, L298N_CCW);
+		l298n_setRotation(L298N_MOTOR_B, L298N_CW);
+		l298n_setSpeed(L298N_MOTOR_A, ROOM_SEARCH_DRV_SPD);
+		l298n_setSpeed(L298N_MOTOR_B, ROOM_SEARCH_DRV_SPD);
+		while (1) {
+			// check cat and timeout
+			if (rpi_foundCat() == TRUE) goto lbl_found;
+			if (flagCatSearchTimeout) { // couldn't find cat, start wait-calling mode
+				goto lbl_timeoutWait;
+			}
+			// check dist
+			if (periph_irSnsrRaw() <= 35.0) { // obstacle ahead
+				l298n_setRotation(L298N_MOTOR_A, L298N_STOP); // stop
+				l298n_setRotation(L298N_MOTOR_B, L298N_STOP);
+				break; // do rotation again
+			}
+		}
+
+		// check cat and timeout
+		if (rpi_foundCat() == TRUE) goto lbl_found;
+		if (flagCatSearchTimeout) { // couldn't find cat, start wait-calling mode
+			goto lbl_timeoutWait;
+		}
+	}
+
+	return SEARCH_TIMEOUT;
+
+	lbl_found:
+	l298n_setRotation(L298N_MOTOR_A, L298N_STOP);
+	l298n_setRotation(L298N_MOTOR_B, L298N_STOP);
+	sndRptIsSet = FALSE;
+	sndRptOutputStat = FALSE;
+	buzzer_mute();
+	core_call_delayms(250);
+	buzzer_setTone(toneC6);
+	buzzer_setDuty(50);
+	buzzer_unmute();
+	core_call_delayms(300);
+	buzzer_mute();
+	return SEARCH_SUCCESS;
+
+	lbl_timeoutWait:
+	l298n_setRotation(L298N_MOTOR_A, L298N_STOP); // stop first
+	l298n_setRotation(L298N_MOTOR_B, L298N_STOP);
+	// set tone
+	buzzer_setTone(toneF6);
+	buzzer_setDuty(25);
+	// set sound on/off to true
+	buzzer_unmute();
+	sndRptOutputStat = TRUE;
+	sndRptIsSet = TRUE;
+	// set timeout time and marker
+	vibWaitTime = VIB_WAIT_TIME;
+	vibWaitIsSet = TRUE;
+	while (1) {
+		// check for vibration every 100ms
+		if (periph_isVibration() == TRUE) { // detected vibration
+			vibWaitIsSet = FALSE;
+			vibWaitTime = 0;
+			sndRptIsSet = FALSE;
+			sndRptOutputStat = FALSE;
+			buzzer_mute();
+			return SEARCH_SUCCESS;
+		}
+		// check for timeout
+		if (flagVibWaitTimeout == TRUE) {
+			// notify autoplay is cancelled, and make robot silent.
+			vibWaitIsSet = FALSE;
+			vibWaitTime = 0;
+			buzzer_setTone(toneA4);
+			buzzer_setDuty(50);
+			for (int i = 0; i < 5; i++) {
+				buzzer_unmute();
+				core_call_delayms(500);
+				buzzer_mute();
+				core_call_delayms(500);
+			}
+			isAutoplayCancelled = TRUE; // mark cancelled
+			l298n_disable(); // disable motors
+			sg90_disable(SG90_MOTOR_A);
+			sndRptIsSet = FALSE;
+			sndRptOutputStat = FALSE;
+			buzzer_mute();
+			return SEARCH_TIMEOUT;
+		}
+		core_call_delayms(25);
+	}
+}
+
 static void giveSnack() {
 	buzzer_setTone(toneFS6);
 	buzzer_setDuty(50);
@@ -504,6 +739,20 @@ static void manualDrive() {
 						l298n_setSpeed(L298N_MOTOR_A, MAN_ROT_SPD);
 						l298n_setSpeed(L298N_MOTOR_B, MAN_ROT_SPD);
 						break;
+#ifdef _2X_MAN_DRV_SPD
+					case '1': // forward
+						l298n_setRotation(L298N_MOTOR_A, L298N_CCW);
+						l298n_setRotation(L298N_MOTOR_B, L298N_CW);
+						l298n_setSpeed(L298N_MOTOR_A, MAN_DRV_SPD * 2);
+						l298n_setSpeed(L298N_MOTOR_B, MAN_DRV_SPD * 2);
+						break;
+					case '2': // reverse
+						l298n_setRotation(L298N_MOTOR_A, L298N_CW);
+						l298n_setRotation(L298N_MOTOR_B, L298N_CCW);
+						l298n_setSpeed(L298N_MOTOR_A, MAN_DRV_SPD * 2);
+						l298n_setSpeed(L298N_MOTOR_B, MAN_DRV_SPD * 2);
+						break;
+#else
 					case '1': // forward
 						l298n_setRotation(L298N_MOTOR_A, L298N_CCW);
 						l298n_setRotation(L298N_MOTOR_B, L298N_CW);
@@ -516,6 +765,7 @@ static void manualDrive() {
 						l298n_setSpeed(L298N_MOTOR_A, MAN_DRV_SPD);
 						l298n_setSpeed(L298N_MOTOR_B, MAN_DRV_SPD);
 						break;
+#endif
 					}
 				}
 				else if (rpidta.type == TYPE_MANUAL_CTRL && rpidta.container[0] != '0') {
@@ -544,7 +794,6 @@ static void autoDrive() {
 	//uint8_t rpiPinDta = 0;
 	uint8_t patternCode, patternCodePrev;
 	int snackIntvCnt;
-	_Bool foundCatOnce = FALSE;
 
 	autoplayStatus = AUTOPLAY_STATUS_BEGIN;
 	patternCode = 0;
@@ -561,86 +810,7 @@ static void autoDrive() {
 		goto lbl_autoDrive_play;
 	}
 
-	// set cat searching flag
-	catSearchWaitTime = CAT_SEARCH_WAIT_TIME;
-	catSearchIsSet = TRUE;
-	flagCatSearchTimeout = FALSE;
-
-	// call & find cat
-	rpi_sendPin(RPI_PINCODE_O_SCHEDULE_EXE);
-	core_call_delayms(1000);
-
-	l298n_setRotation(L298N_MOTOR_A, L298N_CW); // rotate left slowly, to find cat
-	l298n_setRotation(L298N_MOTOR_B, L298N_CW);
-	l298n_setSpeed(L298N_MOTOR_A, AUTO_MIN_ROT_SPD);
-	l298n_setSpeed(L298N_MOTOR_B, AUTO_MIN_ROT_SPD);
-	rpi_foundCat(); // clears age-old flag
-	foundCatOnce = FALSE;
-	while (1) {
-		if (rpi_foundCat() == TRUE) foundCatOnce = TRUE;
-		//if (foundCatOnce && periph_irSnsrChk(IR_SNSR_MODE_LONG) == IR_SNSR_NEAR) { // cat is found, check distance
-		if (foundCatOnce) { // cat is found, no distance check
-			// do something
-			sndRptIsSet = FALSE;
-			sndRptOutputStat = FALSE;
-			buzzer_mute();
-			core_call_delayms(250);
-			buzzer_setTone(toneC6);
-			buzzer_setDuty(50);
-			buzzer_unmute();
-			core_call_delayms(300);
-			buzzer_mute();
-			break;
-		}
-		if (flagCatSearchTimeout) { // couldn't find cat, start wait-calling mode
-			l298n_setRotation(L298N_MOTOR_A, L298N_STOP); // stop first
-			l298n_setRotation(L298N_MOTOR_B, L298N_STOP);
-			// set tone
-			buzzer_setTone(toneF6);
-			buzzer_setDuty(25);
-			// set sound on/off to true
-			buzzer_unmute();
-			sndRptOutputStat = TRUE;
-			sndRptIsSet = TRUE;
-			// set timeout time and marker
-			vibWaitTime = VIB_WAIT_TIME;
-			vibWaitIsSet = TRUE;
-			while (1) {
-				// check for vibration every 100ms
-				if (periph_isVibration() == TRUE) { // detected vibration
-					vibWaitIsSet = FALSE;
-					vibWaitTime = 0;
-					sndRptIsSet = FALSE;
-					sndRptOutputStat = FALSE;
-					buzzer_mute();
-					break;
-				}
-				// check for timeout
-				if (flagVibWaitTimeout == TRUE) {
-					// notify autoplay is cancelled, and make robot silent.
-					vibWaitIsSet = FALSE;
-					vibWaitTime = 0;
-					buzzer_setTone(toneA4);
-					buzzer_setDuty(50);
-					for (int i = 0; i < 5; i++) {
-						buzzer_unmute();
-						core_call_delayms(500);
-						buzzer_mute();
-						core_call_delayms(500);
-					}
-					isAutoplayCancelled = TRUE; // mark cancelled
-					l298n_disable(); // disable motors
-					sg90_disable(SG90_MOTOR_A);
-					sndRptIsSet = FALSE;
-					sndRptOutputStat = FALSE;
-					buzzer_mute();
-					return;
-				}
-				core_call_delayms(25);
-			}
-			break;
-		}
-	}
+	if (searchCat() == SEARCH_TIMEOUT)
 
 	// play
 	lbl_autoDrive_play:
