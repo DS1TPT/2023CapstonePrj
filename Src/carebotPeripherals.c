@@ -56,6 +56,8 @@ int periph_irSnsrChk(int mode) {
 	 * STM32 ADC res = 12b. 3.3V = 4095, 0V = 0.
 	*/
 
+	if (adcDta == 0) return IR_SNSR_FAR; // safety
+
 	distCM = 59.88676548 / pow(((float)adcDta / 4095.0 * 3.3), 1.17591721); // calculate distance
 
 	switch (mode) { // decide near/far according to pre-set distance of a mode
@@ -77,4 +79,21 @@ int periph_irSnsrChk(int mode) {
 		break;
 	}
 	return IR_SNSR_ERR;
+}
+
+float periph_irSnsrRaw() {
+	HAL_ADC_Start(pAdcHandle);
+	halStat = HAL_ADC_PollForConversion(pAdcHandle, IR_SNSR_POLL_TIMEOUT);
+	adcDta = HAL_ADC_GetValue(pAdcHandle); // get data
+	HAL_ADC_Stop(pAdcHandle);
+	/* equation for GP2Y0A02 (y: voltage, x = cm)
+	 * y = 32.467x^-0.8504
+	 * x = 59.88676548 / (y^1.17591721)
+	 * range of x: 15cm(min) or 20cm(typ) to 150cm
+	 * STM32 ADC res = 12b. 3.3V = 4095, 0V = 0.
+	*/
+
+	if (adcDta == 0) return 150.0; // safety. 150 is max distance
+
+	return 59.88676548 / pow(((float)adcDta / 4095.0 * 3.3), 1.17591721); // return calculated distance
 }
