@@ -54,5 +54,6 @@ void periph_laser_on();
 void periph_laser_off();
 _Bool periph_isVibration();
 int periph_irSnsrChk(int mode);
+float periph_irSnsrRaw();
 
 #endif
