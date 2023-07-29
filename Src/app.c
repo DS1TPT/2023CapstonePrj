@@ -131,6 +131,7 @@ static int searchCat() { // returns SEARCH_SUCCESS or SEARCH_TIMEOUT
 	float longestDist = 0.0;
 	int longestCnt = 0;
 	int32_t msElapsedCnt = 0;
+	_Bool isFirstRot = TRUE;
 
 	// set cat searching flag
 	catSearchWaitTime = CAT_SEARCH_TOTAL_WAIT_TIME;
@@ -146,6 +147,7 @@ static int searchCat() { // returns SEARCH_SUCCESS or SEARCH_TIMEOUT
 	longestDist = 0.0;
 	longestCnt = 0;
 	msElapsedCnt = 0;
+	isFirstRot = TRUE;
 
 	l298n_setRotation(L298N_MOTOR_A, L298N_CW); // rotate left slowly to find obstacles
 	l298n_setRotation(L298N_MOTOR_B, L298N_CW);
@@ -185,6 +187,7 @@ static int searchCat() { // returns SEARCH_SUCCESS or SEARCH_TIMEOUT
 	}
 
 	// stage: search room
+	msElapsedCnt = 0;
 
 	l298n_setRotation(L298N_MOTOR_A, L298N_STOP);
 	l298n_setRotation(L298N_MOTOR_B, L298N_STOP);
@@ -202,12 +205,18 @@ static int searchCat() { // returns SEARCH_SUCCESS or SEARCH_TIMEOUT
 
 			l298n_setRotation(L298N_MOTOR_A, L298N_STOP);
 			l298n_setRotation(L298N_MOTOR_B, L298N_STOP);
-			core_call_delayms(50);
+			core_call_delayms(100);
 
 			// check cat and timeout
 			if (rpi_foundCat() == TRUE) goto lbl_found;
 			if (flagCatSearchTimeout) { // couldn't find cat, start wait-calling mode
 				goto lbl_timeoutWait;
+			}
+
+			// ignore 180 +- 54deg after first rotation, to avoid going back
+			if (isFirstRot == FALSE && i >= 7 && i <= 13) {
+				arrDist18[i] = 1.0;
+				continue;
 			}
 
 			arrDist18[i] = periph_irSnsrRaw();
@@ -253,17 +262,20 @@ static int searchCat() { // returns SEARCH_SUCCESS or SEARCH_TIMEOUT
 			}
 		}
 
+		isFirstRot = FALSE;
+
 		// check cat and timeout
 		if (rpi_foundCat() == TRUE) goto lbl_found;
 		if (flagCatSearchTimeout) { // couldn't find cat, start wait-calling mode
 			goto lbl_timeoutWait;
 		}
 
-		// go forward until obstacle detection(trig: 35cm)
+		// go forward until obstacle detection(trig: 35cm) or 20 seconds timeout
 		l298n_setRotation(L298N_MOTOR_A, L298N_CCW);
 		l298n_setRotation(L298N_MOTOR_B, L298N_CW);
 		l298n_setSpeed(L298N_MOTOR_A, ROOM_SEARCH_DRV_SPD);
 		l298n_setSpeed(L298N_MOTOR_B, ROOM_SEARCH_DRV_SPD);
+		msElapsedCnt = 0;
 		while (1) {
 			// check cat and timeout
 			if (rpi_foundCat() == TRUE) goto lbl_found;
@@ -271,11 +283,13 @@ static int searchCat() { // returns SEARCH_SUCCESS or SEARCH_TIMEOUT
 				goto lbl_timeoutWait;
 			}
 			// check dist
-			if (periph_irSnsrRaw() <= 35.0) { // obstacle ahead
+			if (periph_irSnsrRaw() <= 35.0 || msElapsedCnt >= 20 * 1000) { // obstacle ahead or timeout
 				l298n_setRotation(L298N_MOTOR_A, L298N_STOP); // stop
 				l298n_setRotation(L298N_MOTOR_B, L298N_STOP);
 				break; // do rotation again
 			}
+			core_call_delayms(500);
+			msElapsedCnt += 500;
 		}
 
 		// check cat and timeout
@@ -767,6 +781,9 @@ static void manualDrive() {
 						break;
 #endif
 					}
+				}
+				else if (rpidta.type == TYPE_MANUAL_CTRL && rpidta.container[0] == '1' && rpidta.container[1] == '0') {
+					giveSnack();
 				}
 				else if (rpidta.type == TYPE_MANUAL_CTRL && rpidta.container[0] != '0') {
 					if (rpidta.container[0] == 'P') {
