@@ -64,7 +64,7 @@ const uint8_t AUTO_MIN_ROT_SPD = 38;
 const uint8_t AUTO_MIN_DRV_SPD = 38;
 const uint8_t ROOM_SEARCH_ROT_SPD = AUTO_MIN_ROT_SPD * 2;
 const uint8_t ROOM_SEARCH_DRV_SPD = 95;
-const int32_t ROOM_SEARCH_ROT_TIME_18DEG = 550; // in milliseconds
+const int32_t ROOM_SEARCH_ROT_TIME_18DEG = 250; // in milliseconds
 //const int32_t ROOM_SEARCH_ROT_TIME_30DEG = 890; // in milliseconds
 const uint8_t SPD_OVERSHOOT_ADDEND = ((AUTO_DEF_ROT_SPD >= 50 || AUTO_DEF_DRV_SPD >= 50) ? 0 : (AUTO_DEF_ROT_SPD > AUTO_DEF_DRV_SPD) ? (100 - AUTO_DEF_DRV_SPD * 2) : (100 - AUTO_DEF_ROT_SPD * 2));
 
@@ -205,7 +205,7 @@ static int searchCat() { // returns SEARCH_SUCCESS or SEARCH_TIMEOUT
 
 			l298n_setRotation(L298N_MOTOR_A, L298N_STOP);
 			l298n_setRotation(L298N_MOTOR_B, L298N_STOP);
-			core_call_delayms(100);
+			core_call_delayms(50);
 
 			// check cat and timeout
 			if (rpi_foundCat() == TRUE) goto lbl_found;
@@ -220,9 +220,9 @@ static int searchCat() { // returns SEARCH_SUCCESS or SEARCH_TIMEOUT
 			}
 
 			arrDist18[i] = periph_irSnsrRaw();
-			if (arrDist18[i] >= 100.0) break; // found very long dist
+			if (arrDist18[i] >= 70.0) break; // found very long dist
 			if (i > 2) {
-				if (arrDist18[i-1] > arrDist18[i] && arrDist18[i-1] > arrDist18[i-2] && arrDist18[i-1] > 65.0) {
+				if (arrDist18[i-1] > arrDist18[i] && arrDist18[i-1] > arrDist18[i-2] && arrDist18[i-1] >= 35.0) {
 					// found a direction that is possibly open
 					l298n_setRotation(L298N_MOTOR_A, L298N_CW); // return to prev angle
 					l298n_setRotation(L298N_MOTOR_B, L298N_CW);
@@ -270,7 +270,7 @@ static int searchCat() { // returns SEARCH_SUCCESS or SEARCH_TIMEOUT
 			goto lbl_timeoutWait;
 		}
 
-		// go forward until obstacle detection(trig: 35cm) or 20 seconds timeout
+		// go forward until obstacle detection(trig: 20cm) or 20 seconds timeout
 		l298n_setRotation(L298N_MOTOR_A, L298N_CCW);
 		l298n_setRotation(L298N_MOTOR_B, L298N_CW);
 		l298n_setSpeed(L298N_MOTOR_A, ROOM_SEARCH_DRV_SPD);
@@ -283,7 +283,7 @@ static int searchCat() { // returns SEARCH_SUCCESS or SEARCH_TIMEOUT
 				goto lbl_timeoutWait;
 			}
 			// check dist
-			if (periph_irSnsrRaw() <= 35.0 || msElapsedCnt >= 20 * 1000) { // obstacle ahead or timeout
+			if (periph_irSnsrRaw() <= 20.0 || periph_irSnsrChk(IR_SNSR_MODE_OP) == IR_SNSR_NEAR || msElapsedCnt >= 20 * 1000) { // obstacle ahead or timeout
 				l298n_setRotation(L298N_MOTOR_A, L298N_STOP); // stop
 				l298n_setRotation(L298N_MOTOR_B, L298N_STOP);
 				break; // do rotation again
@@ -1286,7 +1286,7 @@ void app_start() {
 	*/
 
 	/*
-	// servo test: DIDN'T TEST
+	// servo test: PASS
 	sg90_enable(SG90_MOTOR_A, SNACK_ANG_RDY);
 	while (1) {
 		core_call_delayms(2000);
