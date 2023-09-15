@@ -307,13 +307,31 @@ static int searchCat() { // returns SEARCH_SUCCESS or SEARCH_TIMEOUT
 	sndRptIsSet = FALSE;
 	sndRptOutputStat = FALSE;
 	buzzer_mute();
-	core_call_delayms(250);
+	core_call_delayms(1000); // wait for a second
+
 	buzzer_setTone(toneC6);
 	buzzer_setDuty(50);
-	buzzer_unmute();
-	core_call_delayms(300);
-	buzzer_mute();
-	return SEARCH_SUCCESS;
+	for (int i = 0; i < 3; i++) { // beep 3 times
+		buzzer_unmute();
+		core_call_delayms(300);
+		buzzer_mute();
+		core_call_delayms(300);
+	}
+
+	// move forward for 5 seconds. stop if dist < 40cm
+
+	l298n_setRotation(L298N_MOTOR_A, L298N_CCW);
+	l298n_setRotation(L298N_MOTOR_B, L298N_CW);
+	l298n_setSpeed(L298N_MOTOR_A, ROOM_SEARCH_DRV_SPD);
+	l298n_setSpeed(L298N_MOTOR_B, ROOM_SEARCH_DRV_SPD);
+	for (int i = 0; i < 50; i++) {
+		core_call_delayms(100);
+		if (periph_irSnsrRaw() < 40.0) break;
+	}
+	l298n_setRotation(L298N_MOTOR_A, L298N_STOP);
+	l298n_setRotation(L298N_MOTOR_B, L298N_STOP);
+	core_call_delayms(1500); // wait for 1500ms
+	return SEARCH_SUCCESS; // search complete
 
 	lbl_timeoutWait:
 	l298n_setRotation(L298N_MOTOR_A, L298N_STOP); // stop first
