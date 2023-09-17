@@ -46,7 +46,7 @@ const uint8_t SPD_ADDEND = 3; // THIS NUMBER MUST NOT EXCEED: 100 - MANUAL SPEED
 const uint8_t SPD_SUBTRAHEND = 6; // THIS NUMBER MUST BE LESS THAN: MANUAL SPEED / 4
 const uint8_t DEF_ANG_A = 30; // default angle of snack motor
 //const uint8_t DEF_ANG_B = ; // reserve servo b
-const uint16_t OP_SNACK_RET_MOTOR_WAITING_TIME = 500; // in milliseconds
+const uint16_t OP_SNACK_RET_MOTOR_WAITING_TIME = 650; // in milliseconds
 const int32_t CAT_SEARCH_INITIAL_WAIT_TIME = 20 * 1000; // in milliseconds
 const int32_t CAT_SEARCH_TOTAL_WAIT_TIME = 5 * 60; // in seconds
 const int32_t VIB_WAIT_TIME = 600; // in seconds
@@ -69,7 +69,7 @@ const int32_t ROOM_SEARCH_ROT_TIME_18DEG = 250; // in milliseconds
 const uint8_t SPD_OVERSHOOT_ADDEND = ((AUTO_DEF_ROT_SPD >= 50 || AUTO_DEF_DRV_SPD >= 50) ? 0 : (AUTO_DEF_ROT_SPD > AUTO_DEF_DRV_SPD) ? (100 - AUTO_DEF_DRV_SPD * 2) : (100 - AUTO_DEF_ROT_SPD * 2));
 
 const uint8_t SNACK_ANG_RDY = DEF_ANG_A;
-const uint8_t SNACK_ANG_GIVE = DEF_ANG_A + 90;
+const uint8_t SNACK_ANG_GIVE = DEF_ANG_A + 110;
 
 
 // system variables
@@ -318,16 +318,13 @@ static int searchCat() { // returns SEARCH_SUCCESS or SEARCH_TIMEOUT
 		core_call_delayms(300);
 	}
 
-	// move forward for 5 seconds. stop if dist < 40cm
+	// move forward for 4 seconds.
 
 	l298n_setRotation(L298N_MOTOR_A, L298N_CCW);
 	l298n_setRotation(L298N_MOTOR_B, L298N_CW);
 	l298n_setSpeed(L298N_MOTOR_A, ROOM_SEARCH_DRV_SPD);
 	l298n_setSpeed(L298N_MOTOR_B, ROOM_SEARCH_DRV_SPD);
-	for (int i = 0; i < 50; i++) {
-		core_call_delayms(100);
-		if (periph_irSnsrRaw() < 40.0) break;
-	}
+	core_call_delayms(4000);
 	l298n_setRotation(L298N_MOTOR_A, L298N_STOP);
 	l298n_setRotation(L298N_MOTOR_B, L298N_STOP);
 	core_call_delayms(1500); // wait for 1500ms
@@ -401,12 +398,20 @@ static void giveSnack() {
 	periph_laser_off();
 	core_call_delayms(500);
 
-	l298n_setRotation(L298N_MOTOR_A, L298N_CCW); // forwards to create inertia
+	l298n_setRotation(L298N_MOTOR_A, L298N_CCW); // forward
 	l298n_setRotation(L298N_MOTOR_B, L298N_CW);
 	l298n_setSpeed(L298N_MOTOR_A, L298N_MAX_SPD);
 	l298n_setSpeed(L298N_MOTOR_B, L298N_MAX_SPD);
-	core_call_delayms(1500);
+	core_call_delayms(1000);
+	l298n_setRotation(L298N_MOTOR_A, L298N_STOP); // stop and wait for a sec
+	l298n_setRotation(L298N_MOTOR_B, L298N_STOP);
+	core_call_delayms(1000);
+
 	sg90_setAngle(SG90_MOTOR_A, SNACK_ANG_GIVE);
+	core_call_delayms(OP_SNACK_RET_MOTOR_WAITING_TIME);
+	sg90_setAngle(SG90_MOTOR_A, SNACK_ANG_RDY);
+	core_call_delayms(1000);
+	/*
 	core_call_pendingOpAdd(opcodePendingOp, OP_SNACK_RET_MOTOR_WAITING_TIME);
 	l298n_setRotation(L298N_MOTOR_A, L298N_CW); // backwards, fast speed to use inertia of snack
 	l298n_setRotation(L298N_MOTOR_B, L298N_CCW);
@@ -416,6 +421,7 @@ static void giveSnack() {
 	l298n_setRotation(L298N_MOTOR_A, L298N_STOP);
 	l298n_setRotation(L298N_MOTOR_B, L298N_STOP);
 	core_call_delayms(1000);
+	*/
 }
 
 static void exePattern(int code, int mode) {
@@ -1309,7 +1315,7 @@ void app_start() {
 	while (1) {
 		core_call_delayms(2000);
 		sg90_setAngle(SG90_MOTOR_A, SNACK_ANG_GIVE);
-		core_call_delayms(2000);
+		core_call_delayms(500);
 		sg90_setAngle(SG90_MOTOR_A, SNACK_ANG_RDY);
 	}
 	*/
