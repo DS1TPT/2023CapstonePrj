@@ -3,7 +3,7 @@
 import cv2
 import os
 import RPi.GPIO as GPIO
-# install pyserial: sudo apt-get install python-serial
+# install pyserial with apt: python-serial
 import serial
 import threading
 import socket
@@ -30,7 +30,6 @@ ser.open()
 
 # GPIO 23, 24, 25 is OUTPUT
 # GPIO 02, 03, 08, 09 is INPUT(pull-up)
-#http://lhdangerous.godohosting.com/wiki/index.php/Raspberry_pi_%EC%97%90%EC%84%9C_python%EC%9C%BC%EB%A1%9C_GPIO_%EC%82%AC%EC%9A%A9%ED%95%98%EA%B8%B0
 GPIO.setmode(GPIO.BCM)
 GPIO.setup(23, GPIO.OUT)
 GPIO.setup(24, GPIO.OUT)
@@ -50,8 +49,6 @@ GPIO.output(PIN_OUT_FOUND_CAT, GPIO.LOW)
 
 # BEGIN FUNDAMENTAL FUNC
 def chkCat(): # capture cam, check if cat exists
-#https://pythonprogramming.net/raspberry-pi-camera-opencv-face-detection-tutorial/
-#https://m.blog.naver.com/PostView.naver?isHttpsRedirect=true&blogId=3demp&logNo=221441776368
     cap = cv2.VideoCapture("http://127.0.0.1:9093/?action=stream")
     ret, frame = cap.read()
     face_cascade = cv2.CascadeClassifier('/home/pi/cascades/haarcascade_frontalcatface.xml')
@@ -72,7 +69,6 @@ def serialSend(dta):
 # BEGIN THREADED FUNC
 
 def thr_conn():
-    #https://m.blog.naver.com/PostView.naver?isHttpsRedirect=true&blogId=zeta0807&logNo=222144886241
     HOST = '192.168.1.99'
     PORT = 9903
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
